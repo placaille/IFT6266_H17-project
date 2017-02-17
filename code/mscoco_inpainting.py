@@ -38,6 +38,7 @@ def get_batch_data(batch_idx,
                    caption_path="dict_key_imgID_value_caps_train_and_valid.pkl"):
     '''
     Show an example of how to read the dataset
+    @return inputs, targets, captions, color_count
     '''
 
     data_path = os.path.join(mscoco, split)
@@ -149,7 +150,7 @@ def build_network(input_var=None):
     # decoder
     tconv1_nb_filt = 256
     tconv1_sz_filt = (4, 4)
-    tconv1_sz_padd = 0
+    tconv1_sz_strd = (1, 1)
     # conv1 output size = (4, 4)
 
     upsamp1_sz = (2, 2)
@@ -157,7 +158,7 @@ def build_network(input_var=None):
 
     tconv2_nb_filt = 128
     tconv2_sz_filt = (5, 5)
-    tconv2_sz_padd = 0
+    tconv2_sz_strd = (1, 1)
     # tconv2 output size = (12, 12)
 
     upsamp2_sz = (2, 2)
@@ -165,12 +166,12 @@ def build_network(input_var=None):
 
     tconv3_nb_filt = 64
     tconv3_sz_filt = (5, 5)
-    tconv3_sz_padd = 0
+    tconv3_sz_strd = (1, 1)
     # tconv3 output size = (30, 30)
 
     tconv4_nb_filt = 3
     tconv4_sz_filt = (3, 3)
-    tconv4_sz_padd = 0
+    tconv4_sz_strd = (1, 1)
     # tconv4 output size = (32, 32)
 
     # final output = (3 channels, 32 x 32)
@@ -188,21 +189,21 @@ def build_network(input_var=None):
                               filter_size=conv1_sz_filt, pad=conv1_sz_padd,
                               W=weight_init)
     # Add pooling layer
-    network = lyr.MaxPool2DLayer(incomin=network, pool_size=pool1_sz)
+    network = lyr.MaxPool2DLayer(incoming=network, pool_size=pool1_sz)
 
     # Add convolution layer
     network = lyr.Conv2DLayer(incoming=network, num_filters=conv2_nb_filt,
                               filter_size=conv2_sz_filt, pad=conv2_sz_padd,
                               W=weight_init)
     # Add pooling layer
-    network = lyr.MaxPool2DLayer(incomin=network, pool_size=pool2_sz)
+    network = lyr.MaxPool2DLayer(incoming=network, pool_size=pool2_sz)
 
     # Add convolution layer
     network = lyr.Conv2DLayer(incoming=network, num_filters=conv3_nb_filt,
                               filter_size=conv3_sz_filt, pad=conv3_sz_padd,
                               W=weight_init)
     # Add pooling layer
-    network = lyr.MaxPool2DLayer(incomin=network, pool_size=pool3_sz)
+    network = lyr.MaxPool2DLayer(incoming=network, pool_size=pool3_sz)
 
     network = lyr.FlattenLayer(network)
 
@@ -215,7 +216,7 @@ def build_network(input_var=None):
     network = lyr.TransposedConv2DLayer(incoming=network,
                                         num_filters=tconv1_nb_filt,
                                         filter_size=tconv1_sz_filt,
-                                        pad=tconv1_sz_padd,
+                                        stride=tconv1_sz_strd,
                                         W=weight_init)
     # Add upsampling layer
     network = lyr.Upscale2DLayer(incoming=network, scale_factor=upsamp1_sz)
@@ -224,7 +225,7 @@ def build_network(input_var=None):
     network = lyr.TransposedConv2DLayer(incoming=network,
                                         num_filters=tconv2_nb_filt,
                                         filter_size=tconv2_sz_filt,
-                                        pad=tconv2_sz_padd,
+                                        stride=tconv2_sz_strd,
                                         W=weight_init)
     # Add upsampling layer
     network = lyr.Upscale2DLayer(incoming=network, scale_factor=upsamp2_sz)
@@ -233,14 +234,14 @@ def build_network(input_var=None):
     network = lyr.TransposedConv2DLayer(incoming=network,
                                         num_filters=tconv3_nb_filt,
                                         filter_size=tconv3_sz_filt,
-                                        pad=tconv3_sz_padd,
+                                        stride=tconv3_sz_strd,
                                         W=weight_init)
 
     # Add transposed convolution layer
     network = lyr.TransposedConv2DLayer(incoming=network,
                                         num_filters=tconv4_nb_filt,
                                         filter_size=tconv4_sz_filt,
-                                        pad=tconv4_sz_padd,
+                                        stride=tconv4_sz_strd,
                                         W=weight_init,
                                         nonlinearity=lasagne.nonlinearities.sigmoid)
 
@@ -257,11 +258,28 @@ if __name__ == '__main__':
     targt_data = T.tensor4()
 
     # Setup network, params and updates
-    network = build_network(input_var=input_data[input_idx])
+    network = build_network(input_var=input_data)
     output = lyr.get_output(network)
     loss = T.mean(lasagne.objectives.squared_error(
-        sgmd_output, targt_data[input_idx]))
-    preds = sgmd_output
+        output, targt_data))
+    preds = output
+
+    params = network.get_params(trainable=True)
+    updates = lasagne.updates.adam(loss, params, learning_rate=0.01)
+
+    # Compile Theano functions
+    print 'compiling...'
+    train = theano.function(inputs=[input_data, targt_data], outputs=loss, updates=updates)
+    print '- train compiled.'
+    # valid = theano.function(inputs=[input_idx], outputs=[loss, preds])
+    print '- valid compiled.'
+    print 'compiled.'
+
+    batch_size = 128
+    nb_epochs = 200
+    early_stop_limit = 20
+
+    print 'Starting training...'
 
     for _ in xrange(10):
         feats, labels, capts, color_count = get_batch_data(
@@ -276,4 +294,54 @@ if __name__ == '__main__':
         print labels_rsp.shape
         print len(capts)
 
-    pass
+    valid_loss = []
+    train_loss = []
+    best_valid_loss = float('inf')
+
+    for i in xrange(nb_epochs):
+
+        # iterate over minibatches for training
+        schemes = ShuffledScheme(examples=train_x.shape[0],
+                                 batch_size=batch_size)
+
+        epoch_acc = 0
+        epoch_loss = 0
+        num_batch = 0
+        for batch_idx in schemes.get_request_iterator():
+
+            batch_loss = train(batch_idx)
+            # epoch_acc += batch_acc
+            epoch_loss += batch_loss
+            num_batch += 1
+
+        # train_acc.append(np.round(epoch_acc / num_batch, 4))
+        train_loss.append(np.round(epoch_loss / num_batch, 4))
+
+        epoch_loss, preds = valid(valid_idx)
+        # valid_acc.append(np.round(batch_acc, 4))
+        valid_loss.append(np.round(epoch_loss, 4))
+
+        print 'Epoch #%s of %s' % ((i + 1), nb_epochs)
+        print '- Train (loss %s)' % (train_loss[i])
+        print '- Valid (loss %s)' % (valid_loss[i])
+
+        if valid_loss[i] < best_valid_loss:
+            best_valid_loss = valid_loss[i]
+            best_epoch_idx = i
+            early_stp_counter = 0
+        else:
+            early_stp_counter += 1
+            if early_stp_counter >= early_stop_limit:
+                print '**Early stopping activated, %s epochs without improvement.' % early_stop_limit
+                break
+
+        plt.imsave(fname='img_epoch_%s_.jpg' % (i+1), arr=preds[0][0], cmap='gray')
+
+    print 'Training completed.'
+
+    print 'Best performance -- Epoch #%s' % (best_epoch_idx + 1)
+    print '- Train %s %%' % (train_loss[best_epoch_idx] * 100)
+    print '- Valid %s %%' % (valid_loss[best_epoch_idx] * 100)
+
+    plt.imshow(preds[0])
+    plt.show()
