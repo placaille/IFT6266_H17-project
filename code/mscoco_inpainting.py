@@ -149,20 +149,20 @@ def build_network(input_var=None):
 
     # decoder
     tconv1_nb_filt = 256
-    tconv1_sz_filt = (4, 4)
+    tconv1_sz_filt = (5, 5)
     tconv1_sz_strd = (1, 1)
-    # conv1 output size = (4, 4)
+    # conv1 output size = (5, 5)
 
     upsamp1_sz = (2, 2)
-    # upsamp1 output size = (8, 8)
+    # upsamp1 output size = (10, 10)
 
     tconv2_nb_filt = 128
-    tconv2_sz_filt = (5, 5)
+    tconv2_sz_filt = (4, 4)
     tconv2_sz_strd = (1, 1)
-    # tconv2 output size = (12, 12)
+    # tconv2 output size = (13, 13)
 
     upsamp2_sz = (2, 2)
-    # upsamp2 output size = (24, 24)
+    # upsamp2 output size = (26, 26)
 
     tconv3_nb_filt = 64
     tconv3_sz_filt = (5, 5)
@@ -253,13 +253,12 @@ if __name__ == '__main__':
     dataset_path = init_dataset(args, 'mscoco_inpainting')
 
     # initiate tensors
-    input_idx = T.vector(dtype='int64')  # used for givens idx
     input_data = T.tensor4()  # used for givens database
     targt_data = T.tensor4()
 
     # Setup network, params and updates
-    network = build_network(input_var=input_data)
-    output = lyr.get_output(network)
+    network = build_network(input_var=input_data.dimshuffle(0, 3, 1, 2))
+    output = lyr.get_output(network).dimshuffle(0, 2, 3, 1)
     loss = T.mean(lasagne.objectives.squared_error(
         output, targt_data))
     preds = output
@@ -269,30 +268,20 @@ if __name__ == '__main__':
 
     # Compile Theano functions
     print 'compiling...'
-    train = theano.function(inputs=[input_data, targt_data], outputs=loss, updates=updates)
+    train = theano.function(inputs=[input_data, targt_data], outputs=[
+                            loss, output], updates=updates)
     print '- train compiled.'
     # valid = theano.function(inputs=[input_idx], outputs=[loss, preds])
     print '- valid compiled.'
     print 'compiled.'
 
-    batch_size = 128
+    batch_size = 256
     nb_epochs = 200
-    early_stop_limit = 20
+    early_stop_limit = 10
+    NB_TRAIN = 82782
+    NB_VALID = 40504
 
     print 'Starting training...'
-
-    for _ in xrange(10):
-        feats, labels, capts, color_count = get_batch_data(
-            [xrange(100)], mscoco=dataset_path, split="val2014")
-        assert len(
-            capts) == color_count, 'Nb of captions doesn\'t match number of colored images.'
-
-        feats_rsp = np.reshape(feats, (color_count, 64, 64, 3)) / 255
-        labels_rsp = np.reshape(labels, (color_count, 32, 32, 3)) / 255
-
-        print feats_rsp.shape
-        print labels_rsp.shape
-        print len(capts)
 
     valid_loss = []
     train_loss = []
@@ -301,16 +290,31 @@ if __name__ == '__main__':
     for i in xrange(nb_epochs):
 
         # iterate over minibatches for training
-        schemes = ShuffledScheme(examples=train_x.shape[0],
+        schemes = ShuffledScheme(examples=NB_TRAIN,
                                  batch_size=batch_size)
 
         epoch_acc = 0
         epoch_loss = 0
         num_batch = 0
+
         for batch_idx in schemes.get_request_iterator():
 
-            batch_loss = train(batch_idx)
-            # epoch_acc += batch_acc
+            # get training data for this batch
+            inputs, targts, capts, color_count = get_batch_data(
+                batch_idx, mscoco=dataset_path, split="train2014")
+
+            inputs_rsp = np.reshape(inputs, (color_count, 64, 64, 3)) / 255
+            targts_rsp = np.reshape(targts, (color_count, 32, 32, 3)) / 255
+
+            print 'inputs shape:\t', inputs_rsp.shape
+            print 'targts shape:\t', targts_rsp.shape
+
+            inputs_rsp = inputs_rsp.astype(theano.config.floatX)
+            targts_rsp = targts_rsp.astype(theano.config.floatX)
+
+            batch_loss, output = train(inputs_rsp, targts_rsp)
+
+            print 'outpts shape:\t', output.shape
             epoch_loss += batch_loss
             num_batch += 1
 
@@ -335,7 +339,8 @@ if __name__ == '__main__':
                 print '**Early stopping activated, %s epochs without improvement.' % early_stop_limit
                 break
 
-        plt.imsave(fname='img_epoch_%s_.jpg' % (i+1), arr=preds[0][0], cmap='gray')
+        plt.imsave(fname='img_epoch_%s_.jpg' %
+                   (i + 1), arr=preds[0][0], cmap='gray')
 
     print 'Training completed.'
 
