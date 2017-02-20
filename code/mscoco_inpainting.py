@@ -77,8 +77,8 @@ def get_batch_data(batch_idx,
         targets[color_count - 1] = target
         captions[color_count - 1] = caption_dict[cap_id]
 
-    returns = [inputs[:color_count] / 255,
-               targets[:color_count] / 255,
+    returns = [inputs[:color_count] / 255.,
+               targets[:color_count] / 255.,
                captions,
                color_count]
 
@@ -263,7 +263,7 @@ def build_small_network(input_var=None):
     ##################
 
     input_channels = 3
-    weight_init = lasagne.init.GlorotUniform()
+    weight_init = lasagne.init.Normal()
 
     # encoder
     conv1_nb_filt = 32
@@ -306,7 +306,7 @@ def build_small_network(input_var=None):
     # conv1 output size = (32, 7, 7)
 
     upsamp1_sz = (2, 2)
-    # upsamp1 output size = (14, 14)
+    # upsamp1 output size = (32, 14, 14)
 
     tconv2_nb_filt = 3
     tconv2_sz_filt = (3, 3)
@@ -370,7 +370,8 @@ def build_small_network(input_var=None):
                                         num_filters=tconv2_nb_filt,
                                         filter_size=tconv2_sz_filt,
                                         stride=tconv2_sz_strd,
-                                        W=weight_init)
+                                        W=weight_init,
+                                        nonlinearity=lasagne.nonlinearities.sigmoid)
     # Add upsampling layer
     network = lyr.Upscale2DLayer(incoming=network, scale_factor=upsamp2_sz)
 
@@ -427,8 +428,9 @@ if __name__ == '__main__':
     preds_var = lyr.get_output(network)
     loss = T.mean(lasagne.objectives.squared_error(preds_var, targt_var))
 
-    params = network.get_params(trainable=True)
-    updates = lasagne.updates.adam(loss, params, learning_rate=0.01)
+    params = lyr.get_all_params(network, trainable=True)
+
+    updates = lasagne.updates.adam(loss, params, learning_rate=0.001)
 
     # Compile Theano functions
     print 'compiling...'
@@ -492,7 +494,6 @@ if __name__ == '__main__':
         valid_loss.append(np.round(loss_val, 6))
 
         # Generate images
-
         gen_pics(inputs_val, targts_val, preds_val.transpose((0, 2, 3, 1)), i, save=True)
 
         print '- Epoch valid (loss %s)' % (valid_loss[i])
