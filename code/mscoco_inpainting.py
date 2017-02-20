@@ -419,13 +419,13 @@ if __name__ == '__main__':
     input_data = T.tensor4()
     targt_data = T.tensor4()
 
-    input_data = input_data.dimshuffle(0, 3, 1, 2)
-    targt_data = targt_data.dimshuffle(0, 3, 1, 2)
+    input_var = input_data.dimshuffle((0, 3, 1, 2))
+    targt_var = targt_data.dimshuffle((0, 3, 1, 2))
 
     # Setup network, params and updates
-    network = build_small_network(input_var=input_data)
-    preds = lyr.get_output(network)
-    loss = T.mean(lasagne.objectives.squared_error(preds, targt_data))
+    network = build_small_network(input_var=input_var)
+    preds_var = lyr.get_output(network)
+    loss = T.mean(lasagne.objectives.squared_error(preds_var, targt_var))
 
     params = network.get_params(trainable=True)
     updates = lasagne.updates.adam(loss, params, learning_rate=0.01)
@@ -436,7 +436,7 @@ if __name__ == '__main__':
                             outputs=loss, updates=updates)
     print '- train compiled.'
     valid = theano.function(inputs=[input_data, targt_data],
-                            outputs=[loss, preds])
+                            outputs=[loss, preds_var])
     print '- valid compiled.'
     print 'compiled.'
 
@@ -493,7 +493,7 @@ if __name__ == '__main__':
 
         # Generate images
 
-        gen_pics(inputs_val, targts_val, preds_val.transpose(0, 2, 3, 1), i, save=True)
+        gen_pics(inputs_val, targts_val, preds_val.transpose((0, 2, 3, 1)), i, save=True)
 
         print '- Epoch valid (loss %s)' % (valid_loss[i])
 
