@@ -133,7 +133,7 @@ def build_network(input_var=None):
     pool1_sz = (2, 2)
     # pool1 output size = (30, 30)
 
-    conv2_nb_filt = 32
+    conv2_nb_filt = 64
     conv2_sz_filt = (7, 7)
     conv2_sz_padd = 0
     # conv2 output size = (24, 24)
@@ -141,19 +141,22 @@ def build_network(input_var=None):
     pool2_sz = (4, 4)
     # pool2 size = (6, 6)
 
-    conv3_nb_filt = 32
+    conv3_nb_filt = 128
     conv3_sz_filt = (5, 5)
     conv3_sz_padd = 0
     # conv3 output size = (2, 2)
 
-    pool3_sz = (2, 2)
-    # pool3 output size = (1, 1)
+    dens1_nb_unit = 256
+    # dense1 output (vector 256)
 
-    dens1_nb_unit = 512
-    # dense1 output to the decoder (vector 512)
+    dens2_nb_unit = 256
+    # dense2 output (vector 256)
+
+    rshp_sz = 1
+    # reshape output (256, 1, 1)
 
     # decoder
-    tconv1_nb_filt = 32
+    tconv1_nb_filt = 64
     tconv1_sz_filt = (5, 5)
     tconv1_sz_strd = (1, 1)
     # conv1 output size = (5, 5)
@@ -214,8 +217,10 @@ def build_network(input_var=None):
 
     # Add dense layer
     network = lyr.DenseLayer(network, dens1_nb_unit, W=weight_init)
+    network = lyr.DenseLayer(network, dens2_nb_unit, W=weight_init)
+
     network = lyr.ReshapeLayer(
-        network, (input_var.shape[0], dens1_nb_unit, 1, 1))
+        network, (input_var.shape[0], dens2_nb_unit / (rshp_sz ** 2), rshp_sz, rshp_sz))
 
     # Add transposed convolution layer
     network = lyr.TransposedConv2DLayer(incoming=network,
@@ -424,7 +429,7 @@ if __name__ == '__main__':
     targt_var = targt_data.dimshuffle((0, 3, 1, 2))
 
     # Setup network, params and updates
-    network = build_small_network(input_var=input_var)
+    network = build_network(input_var=input_var)
     preds_var = lyr.get_output(network)
     loss = T.mean(lasagne.objectives.squared_error(preds_var, targt_var))
 
