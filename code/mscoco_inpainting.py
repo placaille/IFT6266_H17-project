@@ -146,6 +146,9 @@ def build_network(input_var=None):
     conv3_sz_padd = 0
     # conv3 output size = (2, 2)
 
+    pool3_sz = (2, 2)
+    # pool3 output size = (32, 1, 1)
+
     dens1_nb_unit = 256
     # dense1 output (vector 256)
 
