@@ -1,5 +1,6 @@
 import lasagne
 import lasagne.layers as lyr
+from lasagne import nonlinearities
 
 
 def cnn_autoencoder(input_var=None):
@@ -274,3 +275,86 @@ def small_cnn_autoencoder(input_var=None):
     network = lyr.Upscale2DLayer(incoming=network, scale_factor=upsamp2_sz)
 
     return network
+
+
+class DCGAN(object):
+    """
+    DCGAN implementation based on Yeh et al. 2016
+    http://arxiv.org/pdf/1607.07539v2
+    - with batch norm
+    - with leaky relus in discriminator only (0.2 slope)
+    - with regular relus in generator
+    """
+
+    def discriminator(input_var=None):
+        """
+        Initialize the DCGAN discriminator network using lasagne
+        Returns the network
+        """
+
+        network = lyr.InputLayer(shape=(None, 3, 64, 64), input_var)
+
+        network = lyr.Conv2DLayer(
+            incoming=network, num_filters=64, filter_size=5, stride=2, pad=2,
+            nonlinearity=nonlinearities.leaky_rectify(0.2)
+        )
+
+        network = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=network, num_filters=128, filter_size=5, stride=2, pad=2,
+            nonlinearity=nonlinearities.leaky_rectify(0.2)
+        ))
+
+        network = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=network, num_filters=256, filter_size=5, stride=2, pad=2,
+            nonlinearity=nonlinearities.leaky_rectify(0.2)
+        ))
+
+        network = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=network, num_filters=512, filter_size=5, stride=2, pad=2,
+            nonlinearity=nonlinearities.leaky_rectify(0.2)
+        ))
+
+        network = lyr.batch_norm(lyr.DenseLayer(
+            incoming=network, num_units=1,
+            nonlinearity=nonlinearities.sigmoid
+        ))
+
+        return network
+
+    def generator(input_var=None):
+        """
+        Initialize the DCGAN generator network using lasagne
+        Returns the network
+        """
+
+        network = lyr.InputLayer(shape=(None, 100), input_var)
+
+        network = lyr.batch_norm(lyr.DenseLayer(
+            incoming=network, num_units=4*4*1024, nonlinearity=nonlinearities.rectify
+        ))
+
+        network = lyr.ReshapeLayer(
+            incoming=network, shape=(input_var.shape[0], 1024, 4, 4)
+        )
+
+        network = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=network, num_filters=512, filter_size=5, stride=2, crop=2
+            nonlinearity=nonlinearities.rectify
+        ))
+
+        network = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=network, num_filters=256, filter_size=5, stride=2, crop=2
+            nonlinearity=nonlinearities.rectify
+        ))
+
+        network = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=network, num_filters=128, filter_size=5, stride=2, crop=2
+            nonlinearity=nonlinearities.rectify
+        ))
+
+        network = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=network, num_filters=3, filter_size=5, stride=2, crop=2
+            nonlinearity=nonlinearities.tanh
+        ))
+
+        return network
