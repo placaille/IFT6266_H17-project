@@ -28,6 +28,8 @@ def get_args():
                         type=int, default=100)
     parser.add_argument('-g', '--gen', help='Number of images to generate from valid',
                         type=int, default=5)
+    parser.add_argument('-v', '--verbose', help='High verbose option used for debug or dev',
+                        action='store_true')
 
     return parser.parse_args()
 
@@ -59,7 +61,7 @@ def main():
     # Calc loss for discriminator
     d_loss_real = - T.mean(T.log(probs_real)) # minimize prob of error on true images
     d_loss_fake = - T.mean(T.log(1 - probs_fake)) # minimize prob of error on fake images
-    loss_discr = discr_real + d_loss_fake
+    loss_discr = d_loss_real + d_loss_fake
 
     # Calc loss for generator
     loss_gener = - d_loss_fake # minimize the error of the discriminator on fake images
