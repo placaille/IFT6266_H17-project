@@ -25,7 +25,7 @@ def get_args():
                           action='store_true')
 
     parser.add_argument('-e', '--epochs', help='Max number of epochs for training',
-                        type=int, default=100)
+                        type=int, default=25)
     parser.add_argument('-g', '--gen', help='Number of images to generate from valid',
                         type=int, default=5)
     parser.add_argument('-v', '--verbose', help='High verbose option used for debug or dev',
@@ -38,10 +38,12 @@ def gen_train_fn(args):
     """
     Generate the networks and returns the train functions
     """
+    if args.verbose:
+        print 'Creating networks...'
+
     # Setup input variables
     inpt_noise = T.matrix()
     inpt_image = T.tensor4()
-    inpt_image = inpt_image.dimshuffle((0, 3, 1, 2))
 
     # Build generator and discriminator
     dc_gan = models.DCGAN(args.verbose)
@@ -72,9 +74,12 @@ def gen_train_fn(args):
 
     # Set update rules for params using adam
     updates_discr = lasagne.updates.adam(
-        loss_discr, params_discr, learning_rate=0.001)
+        loss_discr, params_discr, learning_rate=0.002, beta1=0.5)
     updates_gener = lasagne.updates.adam(
-        loss_gener, params_gener, learning_rate=0.001)
+        loss_gener, params_gener, learning_rate=0.002, beta1=0.5)
+
+    if args.verbose:
+        print 'done.'
 
     # Compile Theano functions
     print 'compiling...'
@@ -87,6 +92,7 @@ def gen_train_fn(args):
     print 'compiled.'
 
     return train_d, train_g
+
 
 def main():
 
@@ -104,8 +110,8 @@ def main():
     #######################################
 
     BATCH_SIZE = 128
-    NB_EPOCHS = args.epochs
-    NB_GEN = args.gen
+    NB_EPOCHS = args.epochs # default 25
+    NB_GEN = args.gen # default 5
     EARLY_STOP_LIMIT = 10
     NB_TRAIN = 82782
     NB_VALID = 40504
@@ -132,15 +138,19 @@ def main():
         for batch_idx in schemes_train.get_request_iterator():
 
             # get training data for this batch
-            inputs, targts, capts, color_count = utils.get_batch_data(
-                batch_idx, mscoco=dataset_path, split="train2014")
+            img_batch, targts, capts, color_count = utils.get_batch_data(
+                batch_idx, mscoco=dataset_path, split="train2014", crop=False)
 
-            batch_loss = train(inputs, targts)
+            # generate batch uniform sample
+            rdm_batch = np.random.uniform(-1., 1., size=(color_count, 100))
+            rdm_batch = rdm_batch.astype(theano.config.floatX)
+
+            d_batch_loss = train_discr(img_batch, rdm_batch)
 
             if num_batch % 100 == 0:
-                print '- train batch %s, loss %s' % (num_batch, np.round(batch_loss, 4))
+                print '- train batch %s, loss %s' % (num_batch, np.round(d_batch_loss, 4))
 
-            epoch_loss += batch_loss
+            epoch_loss += d_batch_loss
             num_batch += 1
 
         train_loss.append(np.round(epoch_loss, 4))
