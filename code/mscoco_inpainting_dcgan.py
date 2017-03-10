@@ -47,7 +47,7 @@ def main():
     inpt_image = inpt_image.dimshuffle((0, 3, 1, 2))
 
     # Build generator and discriminator
-    dc_gan = models.DCGAN()
+    dc_gan = models.DCGAN(args.verbose)
     generator = dc_gan.init_generator(input_var=inpt_noise)
     discriminator = dc_gan.init_discriminator(input_var=inpt_image)
 
@@ -76,10 +76,14 @@ def main():
 
     # Compile Theano functions
     print 'compiling...'
-    train_discr = theano.function([inpt_image, inpt_noise], loss_discr, updates_discr)
+    train_discr = theano.function([inpt_image, inpt_noise], loss_discr, updates=updates_discr)
     print '- 1 of 2 train compiled.'
-    train_gener = theano.function([inpt_image, inpt_noise], loss_gener, updates_gener)
+    train_gener = theano.function([inpt_noise], loss_gener, updates=updates_gener)
     print '- 2 of 2 train compiled.'
+
+    #######################################
+    # Nothing was changed pass this point #
+    #######################################
 
     valid = theano.function(inputs=[input_data, targt_data],
                             outputs=[loss, preds])
