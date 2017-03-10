@@ -277,7 +277,7 @@ def small_cnn_autoencoder(input_var=None):
     return network
 
 
-class DCGAN(object):
+class DCGAN:
     """
     DCGAN implementation based on Yeh et al. 2016
     http://arxiv.org/pdf/1607.07539v2
@@ -286,13 +286,16 @@ class DCGAN(object):
     - with regular relus in generator
     """
 
-    def discriminator(input_var=None):
+    def __init__(self):
+        pass
+
+    def init_discriminator(self, input_var=None):
         """
         Initialize the DCGAN discriminator network using lasagne
         Returns the network
         """
 
-        network = lyr.InputLayer(shape=(None, 3, 64, 64), input_var)
+        network = lyr.InputLayer((None, 3, 64, 64), input_var)
 
         network = lyr.Conv2DLayer(
             incoming=network, num_filters=64, filter_size=5, stride=2, pad=2,
@@ -321,13 +324,13 @@ class DCGAN(object):
 
         return network
 
-    def generator(input_var=None):
+    def init_generator(self, input_var=None):
         """
         Initialize the DCGAN generator network using lasagne
         Returns the network
         """
 
-        network = lyr.InputLayer(shape=(None, 100), input_var)
+        network = lyr.InputLayer((None, 100), input_var)
 
         network = lyr.batch_norm(lyr.DenseLayer(
             incoming=network, num_units=4*4*1024, nonlinearity=nonlinearities.rectify
@@ -338,22 +341,22 @@ class DCGAN(object):
         )
 
         network = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=network, num_filters=512, filter_size=5, stride=2, crop=2
+            incoming=network, num_filters=512, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.rectify
         ))
 
         network = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=network, num_filters=256, filter_size=5, stride=2, crop=2
+            incoming=network, num_filters=256, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.rectify
         ))
 
         network = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=network, num_filters=128, filter_size=5, stride=2, crop=2
+            incoming=network, num_filters=128, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.rectify
         ))
 
         network = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=network, num_filters=3, filter_size=5, stride=2, crop=2
+            incoming=network, num_filters=3, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.tanh
         ))
 
