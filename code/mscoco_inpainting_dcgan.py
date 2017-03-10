@@ -34,13 +34,10 @@ def get_args():
     return parser.parse_args()
 
 
-def main():
-
-    args = get_args()
-
-    # if running on server (MILA), copy dataset locally
-    dataset_path = utils.init_dataset(args, 'mscoco_inpainting')
-
+def gen_train_fn(args):
+    """
+    Generate the networks and returns the train functions
+    """
     # Setup input variables
     inpt_noise = T.matrix()
     inpt_image = T.tensor4()
@@ -55,40 +52,56 @@ def main():
     image_fake = lyr.get_output(generator)
 
     # Get probabilities from discriminator
-    probs_real = lyr.get_output(discriminator) # for real images
-    probs_fake = lyr.get_output(discriminator, inputs=image_fake) # for fake images
+    probs_real = lyr.get_output(discriminator)  # for real images
+    probs_fake = lyr.get_output(
+        discriminator, inputs=image_fake)  # for fake images
 
     # Calc loss for discriminator
-    d_loss_real = - T.mean(T.log(probs_real)) # minimize prob of error on true images
-    d_loss_fake = - T.mean(T.log(1 - probs_fake)) # minimize prob of error on fake images
+    # minimize prob of error on true images
+    d_loss_real = - T.mean(T.log(probs_real))
+    # minimize prob of error on fake images
+    d_loss_fake = - T.mean(T.log(1 - probs_fake))
     loss_discr = d_loss_real + d_loss_fake
 
     # Calc loss for generator
-    loss_gener = - d_loss_fake # minimize the error of the discriminator on fake images
+    loss_gener = - d_loss_fake  # minimize the error of the discriminator on fake images
 
     # Create params dict for both discriminator and generator
     params_discr = lyr.get_all_params(discriminator, trainable=True)
     params_gener = lyr.get_all_params(generator, trainable=True)
 
     # Set update rules for params using adam
-    updates_discr = lasagne.updates.adam(loss_discr, params_discr, learning_rate=0.001)
-    updates_gener = lasagne.updates.adam(loss_gener, params_gener, learning_rate=0.001)
+    updates_discr = lasagne.updates.adam(
+        loss_discr, params_discr, learning_rate=0.001)
+    updates_gener = lasagne.updates.adam(
+        loss_gener, params_gener, learning_rate=0.001)
 
     # Compile Theano functions
     print 'compiling...'
-    train_discr = theano.function([inpt_image, inpt_noise], loss_discr, updates=updates_discr)
+    train_d = theano.function(
+        [inpt_image, inpt_noise], loss_discr, updates=updates_discr)
     print '- 1 of 2 train compiled.'
-    train_gener = theano.function([inpt_noise], loss_gener, updates=updates_gener)
+    train_g = theano.function(
+        [inpt_noise], loss_gener, updates=updates_gener)
     print '- 2 of 2 train compiled.'
+    print 'compiled.'
+
+    return train_d, train_g
+
+def main():
+
+    args = get_args()
+
+    # if running on server (MILA), copy dataset locally
+    dataset_path = utils.init_dataset(args, 'mscoco_inpainting')
+
+    # build network and get theano functions for training
+    train_fn = gen_train_fn(args)
+    train_discr, train_gen = train_fn
 
     #######################################
     # Nothing was changed pass this point #
     #######################################
-
-    valid = theano.function(inputs=[input_data, targt_data],
-                            outputs=[loss, preds])
-    print '- 1 of 1 valid compiled.'
-    print 'compiled.'
 
     BATCH_SIZE = 128
     NB_EPOCHS = args.epochs
