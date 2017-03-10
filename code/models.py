@@ -286,8 +286,8 @@ class DCGAN:
     - with regular relus in generator
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, verbose):
+        self.verbose = verbose
 
     def init_discriminator(self, input_var=None):
         """
@@ -296,41 +296,47 @@ class DCGAN:
         """
 
         lrelu = nonlinearities.LeakyRectify(0.2)
+        layers = []
 
-        network = lyr.InputLayer((None, 3, 64, 64), input_var)
-        print 'discr input layer shape:\t', network.output_shape
+        l_in = lyr.InputLayer((None, 3, 64, 64), input_var)
+        layers.append(l_in)
 
-        network = lyr.Conv2DLayer(
-            incoming=network, num_filters=64, filter_size=5, stride=2, pad=2,
+        l_1 = lyr.Conv2DLayer(
+            incoming=l_in, num_filters=64, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         )
-        print 'discr layer output shape:\t', network.output_shape
+        layers.append(l_1)
 
-        network = lyr.batch_norm(lyr.Conv2DLayer(
-            incoming=network, num_filters=128, filter_size=5, stride=2, pad=2,
+        l_2 = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=l_1, num_filters=128, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         ))
-        print 'discr layer output shape:\t', network.output_shape
+        layers.append(l_2)
 
-        network = lyr.batch_norm(lyr.Conv2DLayer(
-            incoming=network, num_filters=256, filter_size=5, stride=2, pad=2,
+        l_3 = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=l_2, num_filters=256, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         ))
-        print 'discr layer output shape:\t', network.output_shape
+        layers.append(l_3)
 
-        network = lyr.batch_norm(lyr.Conv2DLayer(
-            incoming=network, num_filters=512, filter_size=5, stride=2, pad=2,
+        l_4 = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=l_3, num_filters=512, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         ))
-        print 'discr layer output shape:\t', network.output_shape
+        layers.append(l_4)
 
-        network = lyr.batch_norm(lyr.DenseLayer(
-            incoming=network, num_units=1,
+        l_out = lyr.batch_norm(lyr.DenseLayer(
+            incoming=l_4, num_units=1,
             nonlinearity=nonlinearities.sigmoid
         ))
-        print 'discr layer output shape:\t', network.output_shape
+        layers.append(l_out)
 
-        return network
+        if self.verbose:
+            for i, layer in enumerate(layers):
+                print 'dicriminator layer %s output shape:' %i, layer.output_shape
+
+        return l_out
+
 
     def init_generator(self, input_var=None):
         """
@@ -338,34 +344,46 @@ class DCGAN:
         Returns the network
         """
 
-        network = lyr.InputLayer((None, 100), input_var)
+        layers = []
 
-        network = lyr.batch_norm(lyr.DenseLayer(
-            incoming=network, num_units=4*4*1024, nonlinearity=nonlinearities.rectify
+        l_in = lyr.InputLayer((None, 100), input_var)
+
+        l_1 = lyr.batch_norm(lyr.DenseLayer(
+            incoming=l_in, num_units=4*4*1024, nonlinearity=nonlinearities.rectify
         ))
+        layers.append(l_1)
 
-        network = lyr.ReshapeLayer(
-            incoming=network, shape=(input_var.shape[0], 1024, 4, 4)
+        l_2 = lyr.ReshapeLayer(
+            incoming=l_1, shape=(input_var.shape[0], 1024, 4, 4)
         )
+        layers.append(l_2)
 
-        network = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=network, num_filters=512, filter_size=5, stride=2, crop=2,
+        l_3 = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=l_2, num_filters=512, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.rectify
         ))
+        layers.append(l_3)
 
-        network = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=network, num_filters=256, filter_size=5, stride=2, crop=2,
+        l_4 = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=l_3, num_filters=256, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.rectify
         ))
+        layers.append(l_4)
 
-        network = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=network, num_filters=128, filter_size=5, stride=2, crop=2,
+        l_5 = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=l_4, num_filters=128, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.rectify
         ))
+        layers.append(l_5)
 
-        network = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=network, num_filters=3, filter_size=5, stride=2, crop=2,
+        l_out = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=l_5, num_filters=3, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.tanh
         ))
-        print 'generator output shape:', network.output_shape
-        return network
+        layers.append(l_out)
+
+        if self.verbose:
+            for i, layer in enumerate(layers):
+                print 'generator layer %s output shape:' %i, layer.output_shape
+
+        return l_out
