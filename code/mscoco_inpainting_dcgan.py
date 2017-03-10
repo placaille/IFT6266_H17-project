@@ -39,30 +39,49 @@ def main():
     # if running on server (MILA), copy dataset locally
     dataset_path = utils.init_dataset(args, 'mscoco_inpainting')
 
-    # initiate tensors
-    image_input = T.tensor4()
-    noise_input = T.matrix()
+    # Setup input variables
+    inpt_noise = T.matrix()
+    inpt_image = T.tensor4()
+    inpt_image = inpt_image.dimshuffle((0, 3, 1, 2))
 
-    input_var = input_data.dimshuffle((0, 3, 1, 2))
+    # Build generator and discriminator
+    dc_gan = models.DCGAN()
+    generator = dc_gan.init_generator(input_var=inpt_noise)
+    discriminator = dc_gan.init_discriminator(input_var=inpt_image)
 
-    # Setup network, params and updates
-    network = models.small_cnn_autoencoder(input_var=input_var)
-    outputs = lyr.get_output(network)
-    loss = T.mean(lasagne.objectives.squared_error(outputs, targt_var))
-    preds = lyr.get_output(network, deterministic=True)
+    # Get images from generator
+    image_fake = lyr.get_output(generator)
 
-    params = lyr.get_all_params(network, trainable=True)
+    # Get probabilities from discriminator
+    probs_real = lyr.get_output(discriminator) # for real images
+    probs_fake = lyr.get_output(discriminator, inputs=image_fake) # for fake images
 
-    updates = lasagne.updates.adam(loss, params, learning_rate=0.001)
+    # Calc loss for discriminator
+    d_loss_real = - T.mean(T.log(probs_real)) # minimize prob of error on true images
+    d_loss_fake = - T.mean(T.log(1 - probs_fake)) # minimize prob of error on fake images
+    loss_discr = discr_real + d_loss_fake
+
+    # Calc loss for generator
+    loss_gener = - d_loss_fake # minimize the error of the discriminator on fake images
+
+    # Create params dict for both discriminator and generator
+    params_discr = lyr.get_all_params(discriminator, trainable=True)
+    params_gener = lyr.get_all_params(generator, trainable=True)
+
+    # Set update rules for params using adam
+    updates_discr = lasagne.updates.adam(loss_discr, params_discr, learning_rate=0.001)
+    updates_gener = lasagne.updates.adam(loss_gener, params_gener, learning_rate=0.001)
 
     # Compile Theano functions
     print 'compiling...'
-    train = theano.function(inputs=[input_data, targt_data],
-                            outputs=loss, updates=updates)
-    print '- train compiled.'
+    train_discr = theano.function([inpt_image, inpt_noise], loss_discr, updates_discr)
+    print '- 1 of 2 train compiled.'
+    train_gener = theano.function([inpt_image, inpt_noise], loss_gener, updates_gener)
+    print '- 2 of 2 train compiled.'
+
     valid = theano.function(inputs=[input_data, targt_data],
                             outputs=[loss, preds])
-    print '- valid compiled.'
+    print '- 1 of 1 valid compiled.'
     print 'compiled.'
 
     BATCH_SIZE = 128
