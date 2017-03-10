@@ -347,39 +347,36 @@ class DCGAN:
         layers = []
 
         l_in = lyr.InputLayer((None, 100), input_var)
+        layers.append(l_in)
 
         l_1 = lyr.batch_norm(lyr.DenseLayer(
             incoming=l_in, num_units=4*4*1024, nonlinearity=nonlinearities.rectify
         ))
-        layers.append(l_1)
-
-        l_2 = lyr.ReshapeLayer(
+        l_1 = lyr.ReshapeLayer(
             incoming=l_1, shape=(input_var.shape[0], 1024, 4, 4)
         )
+        layers.append(l_1)
+
+        l_2 = lyr.batch_norm(lyr.TransposedConv2DLayer(
+            incoming=l_1, num_filters=512, filter_size=5, stride=2, output_size=8,
+            nonlinearity=nonlinearities.rectify
+        ))
         layers.append(l_2)
 
         l_3 = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=l_2, num_filters=512, filter_size=5, stride=2,
-            output_size=(None, 512, 8, 8),
+            incoming=l_2, num_filters=256, filter_size=5, stride=2, output_size=16,
             nonlinearity=nonlinearities.rectify
         ))
         layers.append(l_3)
 
         l_4 = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=l_3, num_filters=256, filter_size=5, stride=2,
-            output_size=(None, 256, 8, 8),
+            incoming=l_3, num_filters=128, filter_size=5, stride=2, output_size=32,
             nonlinearity=nonlinearities.rectify
         ))
         layers.append(l_4)
 
-        l_5 = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=l_4, num_filters=128, filter_size=5, stride=2, crop=2,
-            nonlinearity=nonlinearities.rectify
-        ))
-        layers.append(l_5)
-
         l_out = lyr.batch_norm(lyr.TransposedConv2DLayer(
-            incoming=l_5, num_filters=3, filter_size=5, stride=2,
+            incoming=l_4, num_filters=3, filter_size=5, stride=2, output_size=64,
             nonlinearity=nonlinearities.tanh
         ))
         layers.append(l_out)
