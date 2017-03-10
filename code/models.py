@@ -295,32 +295,40 @@ class DCGAN:
         Returns the network
         """
 
+        lrelu = nonlinearities.LeakyRectify(0.2)
+
         network = lyr.InputLayer((None, 3, 64, 64), input_var)
+        print 'discr input layer shape:\t', network.output_shape
 
         network = lyr.Conv2DLayer(
             incoming=network, num_filters=64, filter_size=5, stride=2, pad=2,
-            nonlinearity=nonlinearities.leaky_rectify(0.2)
+            nonlinearity=lrelu
         )
+        print 'discr layer output shape:\t', network.output_shape
 
         network = lyr.batch_norm(lyr.Conv2DLayer(
             incoming=network, num_filters=128, filter_size=5, stride=2, pad=2,
-            nonlinearity=nonlinearities.leaky_rectify(0.2)
+            nonlinearity=lrelu
         ))
+        print 'discr layer output shape:\t', network.output_shape
 
         network = lyr.batch_norm(lyr.Conv2DLayer(
             incoming=network, num_filters=256, filter_size=5, stride=2, pad=2,
-            nonlinearity=nonlinearities.leaky_rectify(0.2)
+            nonlinearity=lrelu
         ))
+        print 'discr layer output shape:\t', network.output_shape
 
         network = lyr.batch_norm(lyr.Conv2DLayer(
             incoming=network, num_filters=512, filter_size=5, stride=2, pad=2,
-            nonlinearity=nonlinearities.leaky_rectify(0.2)
+            nonlinearity=lrelu
         ))
+        print 'discr layer output shape:\t', network.output_shape
 
         network = lyr.batch_norm(lyr.DenseLayer(
             incoming=network, num_units=1,
             nonlinearity=nonlinearities.sigmoid
         ))
+        print 'discr layer output shape:\t', network.output_shape
 
         return network
 
@@ -359,5 +367,5 @@ class DCGAN:
             incoming=network, num_filters=3, filter_size=5, stride=2, crop=2,
             nonlinearity=nonlinearities.tanh
         ))
-
+        print 'generator output shape:', network.output_shape
         return network
