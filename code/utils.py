@@ -9,7 +9,8 @@ import theano
 def get_batch_data(batch_idx,
                    # PATH need to be fixed
                    mscoco="/Tmp/inpainting/", split="train2014",
-                   caption_path="dict_key_imgID_value_caps_train_and_valid.pkl"):
+                   caption_path="dict_key_imgID_value_caps_train_and_valid.pkl",
+                   crop=True):
     '''
     Show an example of how to read the dataset
     @return inputs, targets, captions, color_count
@@ -25,8 +26,8 @@ def get_batch_data(batch_idx,
     batch_imgs = imgs[batch_idx]
 
     color_count = 0
-    inputs = np.ndarray((len(batch_idx), 64, 64, 3)).astype(theano.config.floatX)
-    targets = np.ndarray((len(batch_idx), 32, 32, 3)).astype(theano.config.floatX)
+    inputs = np.ndarray((len(batch_idx), 3, 64, 64)).astype(theano.config.floatX)
+    targets = np.ndarray((len(batch_idx), 3, 32, 32)).astype(theano.config.floatX)
     captions = {}
     for i, img_path in enumerate(batch_imgs):
         img = Image.open(img_path)
@@ -39,16 +40,17 @@ def get_batch_data(batch_idx,
             int(np.floor(img_array.shape[0] / 2.)), int(np.floor(img_array.shape[1] / 2.)))
         if len(img_array.shape) == 3:  # if colored images (RGB)
             input = np.copy(img_array)
-            input[center[0] - 16:center[0] + 16,
-                  center[1] - 16:center[1] + 16, :] = 0
+            if crop:
+                input[center[0] - 16:center[0] + 16,
+                      center[1] - 16:center[1] + 16, :] = 0
             target = img_array[center[0] - 16:center[0] +
                                16, center[1] - 16:center[1] + 16, :]
             color_count += 1
         else:  # if black and white (do nothing)
             continue
 
-        inputs[color_count - 1] = input
-        targets[color_count - 1] = target
+        inputs[color_count - 1] = np.transpose(input, (2, 0, 1))
+        targets[color_count - 1] = np.transpose(target, (2, 0, 1))
         captions[color_count - 1] = caption_dict[cap_id]
 
     returns = [inputs[:color_count] / 255.,
