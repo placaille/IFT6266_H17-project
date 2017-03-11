@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import argparse
 import numpy as np
 import theano
 import theano.tensor as T
@@ -11,28 +10,6 @@ from fuel.schemes import ShuffledScheme
 
 import models
 import utils
-
-
-def get_args():
-    """
-    Returns the arguments passed by command-line
-    """
-    parser = argparse.ArgumentParser()
-    load_src = parser.add_mutually_exclusive_group(required=True)
-    load_src.add_argument('-m', '--mila', help='If running from MILA servers',
-                          action='store_true')
-    load_src.add_argument('-l', '--laptop', help='If running from laptop',
-                          action='store_true')
-
-    parser.add_argument('-e', '--epochs', help='Max number of epochs for training',
-                        type=int, default=25)
-    parser.add_argument('-g', '--gen', help='Number of images to generate from valid',
-                        type=int, default=5)
-    parser.add_argument('-v', '--verbose', help='High verbose option used for debug or dev',
-                        action='store_true')
-
-    return parser.parse_args()
-
 
 def gen_train_fn(args):
     """
@@ -96,7 +73,7 @@ def gen_train_fn(args):
 
 def main():
 
-    args = get_args()
+    args = utils.get_args()
 
     # if running on server (MILA), copy dataset locally
     dataset_path = utils.init_dataset(args, 'mscoco_inpainting')
