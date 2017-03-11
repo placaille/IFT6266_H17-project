@@ -17,7 +17,7 @@ if __name__ == '__main__':
 
     NB_TRAIN = 82782
     NB_VALID = 40504
-    MAX_IMGS = 200
+    MAX_IMGS = 15000
 
     train_count = 0
     valid_count = 0
