@@ -62,6 +62,46 @@ def get_batch_data(batch_idx,
     return returns
 
 
+def load_preprocessed_info(path):
+
+    full_files = np.asarray(sorted(glob.glob(path + '/*_full.npy')))
+    cter_files = np.asarray(sorted(glob.glob(path + '/*_cter.npy')))
+    capt_files = np.asarray(sorted(glob.glob(path + '/*_capt.pkl')))
+
+    full_nb = []
+    cter_nb = []
+    capt_nb = []
+
+    for full, cter, capt in zip(full_files, cter_files, capt_files):
+        full_nb = np.load(open(full, 'r')).shape[0]
+        cter_nb = np.load(open(cter, 'r')).shape[0]
+        capt_nb = len(pkl.load(open(capt, 'rb')))
+
+        assert full_nb == cter_nb == capt_nb, 'nb of elements don\'t match (full%s, cter%s, capt%s)' %(full_nb, cter_nb, capt_nb)
+
+    return (full_files, full_nb), (cter_files, cter_nb), (capt_files, capt_nb)
+
+
+def get_preprocessed_batch_data(batch_idx,
+                   # PATH need to be fixed
+                   path="/Tmp/inpainting/", split="train2014"):
+    '''
+    Show an example of how to read the dataset
+    @return inputs, targets, captions, color_count
+    '''
+
+    data_path = os.path.join(path, split)
+
+    # print data_path + "/*.jpg"
+    imgs = np.asarray(glob.glob(data_path + "/*.jpg"))
+    batch_imgs = imgs[batch_idx]
+
+
+
+    return returns
+
+
+
 def init_dataset(args, dataset_name):
     """
     If running from MILA, copy on /Tmp/lacaillp/datasets/
