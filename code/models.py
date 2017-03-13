@@ -323,12 +323,13 @@ class DCGAN:
             incoming=l_3, num_filters=512, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         ))
+        l_4 = lyr.FlattenLayer(l_4)
         layers.append(l_4)
 
-        l_out = lyr.batch_norm(lyr.DenseLayer(
+        l_out = lyr.DenseLayer(
             incoming=l_4, num_units=1,
             nonlinearity=nonlinearities.sigmoid
-        ))
+        )
         layers.append(l_out)
 
         if self.verbose:
@@ -350,39 +351,39 @@ class DCGAN:
         layers.append(l_in)
 
         l_1 = lyr.batch_norm(lyr.DenseLayer(
-            incoming=l_in, num_units=4*4*1024, nonlinearity=nonlinearities.rectify
+            incoming=l_in, num_units=4*4*512, nonlinearity=nonlinearities.rectify
         ))
         l_1 = lyr.ReshapeLayer(
-            incoming=l_1, shape=(input_var.shape[0], 1024, 4, 4)
+            incoming=l_1, shape=(-1, 512, 4, 4)
         )
         layers.append(l_1)
 
         l_2 = lyr.batch_norm(lyr.Deconv2DLayer(
-            incoming=l_1, num_filters=512, filter_size=5, stride=2, crop=2,
+            incoming=l_1, num_filters=256, filter_size=5, stride=2, crop=2,
             output_size=8,
             nonlinearity=nonlinearities.rectify
         ))
         layers.append(l_2)
 
         l_3 = lyr.batch_norm(lyr.Deconv2DLayer(
-            incoming=l_2, num_filters=256, filter_size=5, stride=2, crop=2,
+            incoming=l_2, num_filters=128, filter_size=5, stride=2, crop=2,
             output_size=16,
             nonlinearity=nonlinearities.rectify
         ))
         layers.append(l_3)
 
         l_4 = lyr.batch_norm(lyr.Deconv2DLayer(
-            incoming=l_3, num_filters=128, filter_size=5, stride=2, crop=2,
+            incoming=l_3, num_filters=64, filter_size=5, stride=2, crop=2,
             output_size=32,
             nonlinearity=nonlinearities.rectify
         ))
         layers.append(l_4)
 
-        l_out = lyr.batch_norm(lyr.Deconv2DLayer(
+        l_out = lyr.Deconv2DLayer(
             incoming=l_4, num_filters=3, filter_size=5, stride=2, crop=2,
             output_size=64,
-            nonlinearity=nonlinearities.sigmoid
-        ))
+            nonlinearity=nonlinearities.tanh
+        )
         layers.append(l_out)
 
         if self.verbose:
