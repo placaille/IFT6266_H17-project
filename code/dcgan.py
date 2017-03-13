@@ -28,26 +28,25 @@ def gen_theano_fn(args):
 
     # Build generator and discriminator
     dc_gan = models.DCGAN(args.verbose)
-    generator = dc_gan.init_generator(input_var=inpt_noise)
-    discriminator = dc_gan.init_discriminator(input_var=inpt_image)
+    generator = dc_gan.init_generator(input_var=None)
+    discriminator = dc_gan.init_discriminator(input_var=None)
 
     # Get images from generator (for training and outputing images)
-    image_fake = lyr.get_output(generator)
-    image_fake_det = lyr.get_output(generator, deterministic=True)
+    image_fake = lyr.get_output(generator, inputs=inpt_noise)
+    image_fake_det = lyr.get_output(generator, inputs=inpt_noise, deterministic=True)
 
     # Get probabilities from discriminator
-    probs_real = lyr.get_output(discriminator)  # for real images
-    probs_fake = lyr.get_output(
-        discriminator, inputs=image_fake)  # for fake images
+    probs_real = lyr.get_output(discriminator, inputs=inpt_image)
+    probs_fake = lyr.get_output(discriminator, inputs=image_fake)
     probs_fake_det = lyr.get_output(
         discriminator, inputs=image_fake_det, deterministic=True)
 
     # Calc loss for discriminator
     # minimize prob of error on true images
-    d_loss_real = - T.mean(T.log(probs_real))
+    # d_loss_real = - T.mean(T.log(probs_real))
     # minimize prob of error on fake images
-    d_loss_fake = - T.mean(T.log(1 - probs_fake))
-    loss_discr = d_loss_real + d_loss_fake
+    # d_loss_fake = - T.mean(T.log(1 - probs_fake))
+    loss_discr = -T.mean(T.log(probs_real) + T.log(1 - probs_fake))
 
     # Calc loss for generator
     # minimize the error of the discriminator on fake images
@@ -59,9 +58,9 @@ def gen_theano_fn(args):
 
     # Set update rules for params using adam
     updates_discr = lasagne.updates.adam(
-        loss_discr, params_discr, learning_rate=0.002, beta1=0.5)
+        loss_discr, params_discr, learning_rate=0.001, beta1=0.9)
     updates_gener = lasagne.updates.adam(
-        loss_gener, params_gener, learning_rate=0.002, beta1=0.5)
+        loss_gener, params_gener, learning_rate=0.001, beta1=0.9)
 
     if args.verbose:
         print 'Networks created.'
@@ -173,11 +172,11 @@ def main():
                 # generate batch of uniform samples
                 rdm_batch_g = np.random.uniform(-1.,
                                                 1., size=(len(batch_idx), 100))
-                rdm_batch_g = rdm_batch_d.astype(theano.config.floatX)
+                rdm_batch_g = rdm_batch_g.astype(theano.config.floatX)
 
                 # train with a minibatch on generator
                 g_batch_loss = train_gen(rdm_batch_g)
-
+                # g_batch_loss = 0
                 if num_batch % BATCH_PRINT_DELAY == 0:
                     print '- train batch %s, loss (d, g) (%s, %s)' % (num_batch, np.round(d_batch_loss, 4), np.round(g_batch_loss, 4))
 
