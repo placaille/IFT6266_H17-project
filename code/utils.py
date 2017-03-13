@@ -161,6 +161,27 @@ def gen_pics(inputs, targts, preds, epoch, show=False, save=False):
                 pred_im.show(title='img_epoch_%s_id_%s_pred' % (epoch + 1, i))
 
 
+def gen_pics_gan(preds, epoch, show=False, save=False):
+    """
+    Generates and/or save image out of array using PIL
+    """
+    if save or show:
+
+        i = 0
+        for pred in preds:
+
+            i += 1
+            pred_im = Image.fromarray(np.uint8(pred * 255))
+
+            if save:
+
+                pred_im.save('./output/img_epoch_%s_id_%s_pred.jpg' % (epoch + 1, i))
+
+            if show:
+
+                pred_im.show(title='img_epoch_%s_id_%s_pred' % (epoch + 1, i))
+
+
 def get_args():
     """
     Returns the arguments passed by command-line
