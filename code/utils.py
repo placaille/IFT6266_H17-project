@@ -189,7 +189,7 @@ def get_args():
 
     parser.add_argument('-e', '--epochs', help='Max number of epochs for training',
                         type=int, default=25)
-    parser.add_argument('-g', '--gen', help='Number of images to generate from valid',
+    parser.add_argument('-g', '--gen', help='Number of images to generate',
                         type=int, default=5)
     parser.add_argument('-v', '--verbose', help='High verbose option used for debug or dev',
                         action='store_true')
