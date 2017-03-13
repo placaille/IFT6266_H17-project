@@ -14,6 +14,7 @@ from fuel.schemes import ShuffledScheme
 import models
 import utils
 
+
 def gen_train_fn(args):
     """
     Generate the networks and returns the train functions
@@ -46,7 +47,7 @@ def gen_train_fn(args):
     loss_discr = d_loss_real + d_loss_fake
 
     # Calc loss for generator
-    loss_gener = - d_loss_fake  # minimize the error of the discriminator on fake images
+    loss_gener = - T.mean(T.log(probs_fake))  # minimize the error of the discriminator on fake images
 
     # Create params dict for both discriminator and generator
     params_discr = lyr.get_all_params(discriminator, trainable=True)
@@ -92,20 +93,34 @@ def main():
     #######################################
 
     BATCH_SIZE = 128
-    NB_EPOCHS = args.epochs # default 25
-    NB_GEN = args.gen # default 5
+    NB_EPOCHS = args.epochs  # default 25
+    NB_GEN = args.gen  # default 5
     EARLY_STOP_LIMIT = 10
     NB_TRAIN = 82782
     NB_VALID = 40504
 
-    train_full_files = np.asarray(sorted(glob.glob(train_path + '/*_full.npy')))
-    train_cter_files = np.asarray(sorted(glob.glob(train_path + '/*_cter.npy')))
-    train_capt_files = np.asarray(sorted(glob.glob(train_path + '/*_capt.pkl')))
-    NB_TRAIN_FILES = len(train_full_files)
+    if args.verbose:
+        BATCH_PRINT_DELAY = 1
+    else:
+        BATCH_PRINT_DELAY = 100
 
-    valid_full_files = np.asarray(sorted(glob.glob(valid_path + '/*_full.npy')))
-    valid_cter_files = np.asarray(sorted(glob.glob(valid_path + '/*_cter.npy')))
-    valid_capt_files = np.asarray(sorted(glob.glob(valid_path + '/*_capt.pkl')))
+    # get different file names for the split data set
+    train_full_files = np.asarray(
+        sorted(glob.glob(train_path + '/*_full.npy')))
+    train_cter_files = np.asarray(
+        sorted(glob.glob(train_path + '/*_cter.npy')))
+    train_capt_files = np.asarray(
+        sorted(glob.glob(train_path + '/*_capt.pkl')))
+
+    valid_full_files = np.asarray(
+        sorted(glob.glob(valid_path + '/*_full.npy')))
+    valid_cter_files = np.asarray(
+        sorted(glob.glob(valid_path + '/*_cter.npy')))
+    valid_capt_files = np.asarray(
+        sorted(glob.glob(valid_path + '/*_capt.pkl')))
+
+    NB_TRAIN_FILES = len(train_full_files)
+    NB_VALID_FILES = len(valid_full_files)
 
     print 'Starting training...'
 
@@ -126,10 +141,15 @@ def main():
         # iterate of split datasets
         for file_id in np.random.choice(NB_TRAIN_FILES, NB_TRAIN_FILES, replace=False):
 
+            t_load = time.time()
             # load file
-            train_full = np.load(open(train_full_files[file_id], 'r'))
-            # train_cter = np.load(open(train_cter_files[file_id], 'r'))
-            # train_capt = pkl.load(open(train_capt_files[file_id], 'rb'))
+            train_full = np.load(open(train_full_files[file_id], 'r')).astype(
+                theano.config.floatX)
+            # train_cter = np.load(open(train_cter_files[file_id], 'r')).astype(theano.config.floatX)
+            # train_capt = pkl.load(open(train_capt_files[file_id], 'rb')).astype(theano.config.floatX)
+
+            if args.verbose:
+                print 'file %s loaded in %s sec' % (train_full_files[file_id], round(time.time() - t_load, 0))
 
             # iterate over minibatches for training
             schemes_train = ShuffledScheme(examples=len(train_full),
@@ -138,21 +158,30 @@ def main():
             for batch_idx in schemes_train.get_request_iterator():
 
                 # generate batch of uniform samples
-                rdm_batch = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
-                rdm_batch = rdm_batch.astype(theano.config.floatX)
+                rdm_batch_d = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
+                rdm_batch_d = rdm_batch_d.astype(theano.config.floatX)
 
-                d_batch_loss = train_discr(train_full[batch_idx], rdm_batch)
+                # train with a minibatch on discriminator
+                d_batch_loss = train_discr(train_full[batch_idx], rdm_batch_d)
 
-                if num_batch % 100 == 0:
-                    print '- train batch %s, loss %s' % (num_batch, np.round(d_batch_loss, 4))
+                # generate batch of uniform samples
+                rdm_batch_g = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
+                rdm_batch_g = rdm_batch_d.astype(theano.config.floatX)
 
-                epoch_loss += d_batch_loss
+                # train with a minibatch on generator
+                g_batch_loss = train_gen(rdm_batch_g)
+
+                if num_batch % BATCH_PRINT_DELAY == 0:
+                    print '- train batch %s, loss (d, g) (%s, %s)' % (num_batch, np.round(d_batch_loss, 4), np.round(g_batch_loss, 4))
+
+                epoch_loss += d_batch_loss + g_batch_loss
                 num_batch += 1
 
         train_loss.append(np.round(epoch_loss, 4))
 
-        print '- Epoch train (loss %s)' % (train_loss[i])
+        print '- Epoch train (loss %s) in %s sec' % (train_loss[i], round(time.time() - t_epoch))
 
+        # generate some random images
         # Validation only done on couple of images for speed
         inputs_val, targts_val, capts_val, color_count_val = utils.get_batch_data(
             ID_PRINT, mscoco=dataset_path, split='val2014')
