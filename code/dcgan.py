@@ -15,7 +15,7 @@ import models
 import utils
 
 
-def gen_train_fn(args):
+def gen_theano_fn(args):
     """
     Generate the networks and returns the train functions
     """
@@ -31,13 +31,16 @@ def gen_train_fn(args):
     generator = dc_gan.init_generator(input_var=inpt_noise)
     discriminator = dc_gan.init_discriminator(input_var=inpt_image)
 
-    # Get images from generator
+    # Get images from generator (for training and outputing images)
     image_fake = lyr.get_output(generator)
+    image_fake_det = lyr.get_output(generator, deterministic=True)
 
     # Get probabilities from discriminator
     probs_real = lyr.get_output(discriminator)  # for real images
     probs_fake = lyr.get_output(
         discriminator, inputs=image_fake)  # for fake images
+    probs_fake_det = lyr.get_output(
+        discriminator, inputs=image_fake_det, deterministic=True)
 
     # Calc loss for discriminator
     # minimize prob of error on true images
@@ -47,7 +50,8 @@ def gen_train_fn(args):
     loss_discr = d_loss_real + d_loss_fake
 
     # Calc loss for generator
-    loss_gener = - T.mean(T.log(probs_fake))  # minimize the error of the discriminator on fake images
+    # minimize the error of the discriminator on fake images
+    loss_gener = - T.mean(T.log(probs_fake))
 
     # Create params dict for both discriminator and generator
     params_discr = lyr.get_all_params(discriminator, trainable=True)
@@ -66,13 +70,15 @@ def gen_train_fn(args):
     print 'compiling...'
     train_d = theano.function(
         [inpt_image, inpt_noise], loss_discr, updates=updates_discr)
-    print '- 1 of 2 train compiled.'
+    print '- 1 of 3 compiled.'
     train_g = theano.function(
         [inpt_noise], loss_gener, updates=updates_gener)
-    print '- 2 of 2 train compiled.'
+    print '- 2 of 3 compiled.'
+    predict = theano.function([inpt_noise], [image_fake_det, probs_fake_det])
+    print '- 3 of 3 compiled.'
     print 'compiled.'
 
-    return train_d, train_g
+    return train_d, train_g, predict
 
 
 def main():
@@ -85,8 +91,8 @@ def main():
     valid_path = os.path.join(dataset_path, 'val2014')
 
     # build network and get theano functions for training
-    train_fn = gen_train_fn(args)
-    train_discr, train_gen = train_fn
+    theano_fn = gen_theano_fn(args)
+    train_discr, train_gen, predict = theano_fn
 
     #######################################
     # Nothing was changed pass this point #
@@ -127,7 +133,6 @@ def main():
     valid_loss = []
     train_loss = []
     best_valid_loss = float('inf')
-    ID_PRINT = np.random.choice(NB_VALID, NB_GEN, replace=False)
 
     for i in xrange(NB_EPOCHS):
 
@@ -158,14 +163,16 @@ def main():
             for batch_idx in schemes_train.get_request_iterator():
 
                 # generate batch of uniform samples
-                rdm_batch_d = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
+                rdm_batch_d = np.random.uniform(-1.,
+                                                1., size=(len(batch_idx), 100))
                 rdm_batch_d = rdm_batch_d.astype(theano.config.floatX)
 
                 # train with a minibatch on discriminator
                 d_batch_loss = train_discr(train_full[batch_idx], rdm_batch_d)
 
                 # generate batch of uniform samples
-                rdm_batch_g = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
+                rdm_batch_g = np.random.uniform(-1.,
+                                                1., size=(len(batch_idx), 100))
                 rdm_batch_g = rdm_batch_d.astype(theano.config.floatX)
 
                 # train with a minibatch on generator
@@ -182,35 +189,46 @@ def main():
         print '- Epoch train (loss %s) in %s sec' % (train_loss[i], round(time.time() - t_epoch))
 
         # generate some random images
-        # Validation only done on couple of images for speed
-        inputs_val, targts_val, capts_val, color_count_val = utils.get_batch_data(
-            ID_PRINT, mscoco=dataset_path, split='val2014')
+        gen_noise = np.random.uniform(-1., 1., size=(NB_GEN, 100))
+        gen_noise = gen_noise.astype(theano.config.floatX)
+        preds_gen, probs_discr = predict(gen_noise)
 
-        loss_val, preds_val = valid(inputs_val, targts_val)
+        if args.verbose:
+            print 'Discriminator prob(real):', probs_discr
 
-        valid_loss.append(np.round(loss_val, 6))
+        # save the images
+        utils.gen_pics_gan(preds_gen, i, show=False, save=True)
+        print '%s images were saved.'
 
-        # Generate images
-        gen_pics(inputs_val, targts_val, preds_val.transpose(
-            (0, 2, 3, 1)), i, save=True)
-
-        print '- Epoch valid (loss %s)' % (valid_loss[i])
-
-        if valid_loss[i] < best_valid_loss:
-            best_valid_loss = valid_loss[i]
-            best_epoch_idx = i
-            early_stp_counter = 0
-        else:
-            early_stp_counter += 1
-            if early_stp_counter >= EARLY_STOP_LIMIT:
-                print '**Early stopping activated, %s epochs without improvement.' % EARLY_STOP_LIMIT
-                break
+        # # Validation only done on couple of images for speed
+        # inputs_val, targts_val, capts_val, color_count_val = utils.get_batch_data(
+        #     ID_PRINT, mscoco=dataset_path, split='val2014')
+        #
+        # loss_val, preds_val = valid(inputs_val, targts_val)
+        #
+        # valid_loss.append(np.round(loss_val, 6))
+        #
+        # # Generate images
+        # gen_pics(inputs_val, targts_val, preds_val.transpose(
+        #     (0, 2, 3, 1)), i, save=True)
+        #
+        # print '- Epoch valid (loss %s)' % (valid_loss[i])
+        #
+        # if valid_loss[i] < best_valid_loss:
+        #     best_valid_loss = valid_loss[i]
+        #     best_epoch_idx = i
+        #     early_stp_counter = 0
+        # else:
+        #     early_stp_counter += 1
+        #     if early_stp_counter >= EARLY_STOP_LIMIT:
+        #         print '**Early stopping activated, %s epochs without improvement.' % EARLY_STOP_LIMIT
+        #         break
 
     print 'Training completed.'
 
-    print 'Best performance -- Epoch #%s' % (best_epoch_idx + 1)
-    print '- Train %s' % (train_loss[best_epoch_idx])
-    print '- Valid %s' % (valid_loss[best_epoch_idx])
+    # print 'Best performance -- Epoch #%s' % (best_epoch_idx + 1)
+    # print '- Train %s' % (train_loss[best_epoch_idx])
+    # print '- Valid %s' % (valid_loss[best_epoch_idx])
 
 
 if __name__ == '__main__':
