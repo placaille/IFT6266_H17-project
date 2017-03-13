@@ -174,11 +174,8 @@ def gen_pics_gan(preds, epoch, show=False, save=False):
             pred_im = Image.fromarray(np.uint8(pred * 255))
 
             if save:
-
                 pred_im.save('./output/img_epoch_%s_id_%s_pred.jpg' % (epoch + 1, i))
-
             if show:
-
                 pred_im.show(title='img_epoch_%s_id_%s_pred' % (epoch + 1, i))
 
 
