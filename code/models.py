@@ -382,7 +382,7 @@ class DCGAN:
         l_out = lyr.Deconv2DLayer(
             incoming=l_4, num_filters=3, filter_size=5, stride=2, crop=2,
             output_size=64,
-            nonlinearity=nonlinearities.tanh
+            nonlinearity=nonlinearities.sigmoid
         )
         layers.append(l_out)
 
