@@ -5,6 +5,7 @@ import cPickle as pkl
 import shutil
 import numpy as np
 import theano
+import lasagne.layers as lyr
 import argparse
 
 def get_batch_data(batch_idx,
@@ -96,8 +97,6 @@ def get_preprocessed_batch_data(batch_idx,
     imgs = np.asarray(glob.glob(data_path + "/*.jpg"))
     batch_imgs = imgs[batch_idx]
 
-
-
     return returns
 
 
@@ -151,9 +150,11 @@ def gen_pics(inputs, targts, preds, epoch, show=False, save=False):
             pred_im = Image.fromarray(np.uint8(pred_im * 255))
 
             if save:
-
-                true_im.save('./output/img_epoch_%s_id_%s_true.jpg' % (epoch + 1, i))
-                pred_im.save('./output/img_epoch_%s_id_%s_pred.jpg' % (epoch + 1, i))
+                path = os.path.join(os.getcwd(), 'output')
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                true_im.save(os.path.join(path, 'img_epoch_%s_id_%s_true.jpg' % (epoch + 1, i)))
+                pred_im.save(os.path.join(path, 'img_epoch_%s_id_%s_pred.jpg' % (epoch + 1, i)))
 
             if show:
 
@@ -161,7 +162,7 @@ def gen_pics(inputs, targts, preds, epoch, show=False, save=False):
                 pred_im.show(title='img_epoch_%s_id_%s_pred' % (epoch + 1, i))
 
 
-def gen_pics_gan(preds, epoch, show=False, save=False):
+def gen_pics_gan(preds, epoch, show=False, save=False, tanh=True):
     """
     Generates and/or save image out of array using PIL
     """
@@ -169,12 +170,53 @@ def gen_pics_gan(preds, epoch, show=False, save=False):
         i = 0
         for pred in preds:
             i += 1
-            pred = (np.transpose(pred, axes=(1, 2, 0)) + 1) / 2.0
+            if tanh:
+                pred = (np.transpose(pred, axes=(1, 2, 0)) + 1) / 2.0
+            else:
+                pred = np.transpose(pred, axes=(1, 2, 0))
             pred_im = Image.fromarray(np.uint8(pred * 255))
             if save:
-                pred_im.save('./output/img_epoch_%s_id_%s_pred.jpg' % (epoch + 1, i))
+                path = os.path.join(os.getcwd(), 'output')
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                pred_im.save(os.path.join(path, 'img_epoch_%s_id_%s_pred.jpg' % (epoch + 1, i)))
+
             if show:
                 pred_im.show(title='img_epoch_%s_id_%s_pred' % (epoch + 1, i))
+
+        if save:
+            print 'images were saved to %s' % path
+
+
+def save_model(network, filename):
+    """
+    Saves the parameters of a model to a pkl file
+    Will try to get save it in './saved_models', otherwise will create it
+    """
+    path = os.path.join(os.getcwd(), 'saved_models')
+    if not os.path.exists(path):
+        os.makedirs(path)
+    full_path = os.path.join(path, filename)
+    with open(full_path, 'wb') as f:
+        pkl.dump(lyr.get_all_param_values(network), f)
+    print 'Model saved to file %s' % filename
+
+
+def reload_model(network, filename):
+    """
+    Returns the network loaded of the parameters
+    Will try to get filename in './saved_models'
+    """
+    path = os.path.join(os.getcwd(), 'saved_models')
+    full_path = os.path.join(path, filename)
+    try:
+        with open(full_path, 'rb') as f:
+            values = pkl.load(full_path)
+    except:
+        print 'An error occured, model wasn\'t loaded.'
+    else:
+        lyr.set_all_param_values(network, values)
+        print 'Network was successfully loaded from %s' % full_path
 
 
 def get_args():
