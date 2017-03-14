@@ -194,5 +194,9 @@ def get_args():
                         type=int, default=5)
     parser.add_argument('-v', '--verbose', help='High verbose option used for debug or dev',
                         action='store_true')
+    parser.add_argument('-s', '--save', help='Save model at each epoch',
+                        action='store_true')
+    parser.add_argument('-r', '--reload', help='Reload previously trained model',
+                        type=str, default=None)
 
     return parser.parse_args()
