@@ -354,7 +354,7 @@ class DCGAN:
             incoming=l_in, num_units=4*4*first_layer*8, nonlinearity=nonlinearities.rectify
         ))
         l_1 = lyr.ReshapeLayer(
-            incoming=l_1, shape=(-1, 512, 4, 4)
+            incoming=l_1, shape=(-1, first_layer*8, 4, 4)
         )
         layers.append(l_1)
 
