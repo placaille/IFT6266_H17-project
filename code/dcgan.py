@@ -27,9 +27,9 @@ def gen_theano_fn(args):
     inpt_image = T.tensor4()
 
     # Build generator and discriminator
-    dc_gan = models.DCGAN(args.verbose)
-    generator = dc_gan.init_generator(input_var=None)
-    discriminator = dc_gan.init_discriminator(input_var=None)
+    dc_gan = models.DCGAN(args)
+    generator = dc_gan.init_generator(first_layer=128, input_var=None)
+    discriminator = dc_gan.init_discriminator(first_layer=128, input_var=None)
 
     # Get images from generator (for training and outputing images)
     image_fake = lyr.get_output(generator, inputs=inpt_noise)
@@ -43,10 +43,10 @@ def gen_theano_fn(args):
 
     # Calc loss for discriminator
     # minimize prob of error on true images
-    # d_loss_real = - T.mean(T.log(probs_real))
+    d_loss_real = - T.mean(T.log(probs_real))
     # minimize prob of error on fake images
-    # d_loss_fake = - T.mean(T.log(1 - probs_fake))
-    loss_discr = -T.mean(T.log(probs_real) + T.log(1 - probs_fake))
+    d_loss_fake = - T.mean(T.log(1 - probs_fake))
+    loss_discr = d_loss_real + d_loss_fake
 
     # Calc loss for generator
     # minimize the error of the discriminator on fake images
@@ -60,7 +60,7 @@ def gen_theano_fn(args):
     updates_discr = lasagne.updates.adam(
         loss_discr, params_discr, learning_rate=0.001, beta1=0.9)
     updates_gener = lasagne.updates.adam(
-        loss_gener, params_gener, learning_rate=0.001, beta1=0.9)
+        loss_gener, params_gener, learning_rate=0.001, beta1=0.6)
 
     if args.verbose:
         print 'Networks created.'
@@ -77,12 +77,26 @@ def gen_theano_fn(args):
     print '- 3 of 3 compiled.'
     print 'compiled.'
 
-    return train_d, train_g, predict
+    return train_d, train_g, predict, (discriminator, generator)
 
 
 def main():
 
     args = utils.get_args()
+
+    BATCH_SIZE = 128
+    NB_EPOCHS = args.epochs  # default 25
+    NB_GEN = args.gen  # default 5
+    EARLY_STOP_LIMIT = 10
+    NB_TRAIN = 82782
+    NB_VALID = 40504
+    GEN_TRAIN_DELAY = 5
+    GEN_TRAIN_LOOPS = 3
+
+    if args.verbose:
+        BATCH_PRINT_DELAY = 1
+    else:
+        BATCH_PRINT_DELAY = 100
 
     # if running on server (MILA), copy dataset locally
     dataset_path = utils.init_dataset(args, 'mscoco_inpainting/preprocessed')
@@ -91,23 +105,7 @@ def main():
 
     # build network and get theano functions for training
     theano_fn = gen_theano_fn(args)
-    train_discr, train_gen, predict = theano_fn
-
-    #######################################
-    # Nothing was changed pass this point #
-    #######################################
-
-    BATCH_SIZE = 128
-    NB_EPOCHS = args.epochs  # default 25
-    NB_GEN = args.gen  # default 5
-    EARLY_STOP_LIMIT = 10
-    NB_TRAIN = 82782
-    NB_VALID = 40504
-
-    if args.verbose:
-        BATCH_PRINT_DELAY = 1
-    else:
-        BATCH_PRINT_DELAY = 100
+    train_discr, train_gen, predict, model = theano_fn
 
     # get different file names for the split data set
     train_full_files = np.asarray(
@@ -132,6 +130,10 @@ def main():
     valid_loss = []
     train_loss = []
     best_valid_loss = float('inf')
+
+    if not args.reload == None:
+        discriminator, generator = model
+        utils.reload_model(discriminator, model, args.reload)
 
     for i in xrange(NB_EPOCHS):
 
@@ -162,33 +164,42 @@ def main():
             for batch_idx in schemes_train.get_request_iterator():
 
                 # generate batch of uniform samples
-                rdm_batch_d = np.random.uniform(-1.,
-                                                1., size=(len(batch_idx), 100))
-                rdm_batch_d = rdm_batch_d.astype(theano.config.floatX)
+                rdm_d = np.random.uniform(0, 1., size=(len(batch_idx), 100))
+                rdm_d = rdm_d.astype(theano.config.floatX)
 
                 # train with a minibatch on discriminator
-                d_batch_loss = train_discr(train_full[batch_idx], rdm_batch_d)
+                d_batch_loss = train_discr(train_full[batch_idx], rdm_d)
 
-                # generate batch of uniform samples
-                rdm_batch_g = np.random.uniform(-1.,
-                                                1., size=(len(batch_idx), 100))
-                rdm_batch_g = rdm_batch_g.astype(theano.config.floatX)
+                if num_batch % GEN_TRAIN_DELAY == 0:
 
-                # train with a minibatch on generator
-                g_batch_loss = train_gen(rdm_batch_g)
-                # g_batch_loss = 0
+                    for _ in xrange(GEN_TRAIN_LOOPS):
+
+                        # generate batch of uniform samples
+                        rdm_g = np.random.uniform(0, 1., size=(len(batch_idx), 100))
+                        rdm_g = rdm_g.astype(theano.config.floatX)
+
+                        # train with a minibatch on generator
+                        g_batch_loss = train_gen(rdm_g)
+
                 if num_batch % BATCH_PRINT_DELAY == 0:
                     print '- train batch %s, loss (d, g) (%s, %s)' % (num_batch, np.round(d_batch_loss, 4), np.round(g_batch_loss, 4))
 
                 epoch_loss += d_batch_loss + g_batch_loss
                 num_batch += 1
 
+
         train_loss.append(np.round(epoch_loss, 4))
+
+        if args.save:
+            discriminator, generator = model
+            utils.save_model(discriminator, 'discrminator_epoch_%s.pkl' % i)
+            utils.save_model(generator, 'generator_epoch_%s.pkl' % i)
+
 
         print '- Epoch train (loss %s) in %s sec' % (train_loss[i], round(time.time() - t_epoch))
 
         # generate some random images
-        gen_noise = np.random.uniform(-1., 1., size=(NB_GEN, 100))
+        gen_noise = np.random.uniform(0, 1., size=(NB_GEN, 100))
         gen_noise = gen_noise.astype(theano.config.floatX)
         preds_gen, probs_discr = predict(gen_noise)
 
@@ -196,8 +207,9 @@ def main():
             print 'Discriminator prob(real):', probs_discr
 
         # save the images
-        utils.gen_pics_gan(preds_gen, i, show=False, save=True)
-        print '%s images were saved.'
+        utils.gen_pics_gan(preds_gen, i, show=False, save=True, tanh=False)
+        utils.gen_pics_gan(train_full[batch_idx], 888, show=False, save=True, tanh=False)
+
 
         # # Validation only done on couple of images for speed
         # inputs_val, targts_val, capts_val, color_count_val = utils.get_batch_data(
