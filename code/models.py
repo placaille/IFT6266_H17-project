@@ -286,10 +286,10 @@ class DCGAN:
     - with regular relus in generator
     """
 
-    def __init__(self, verbose):
-        self.verbose = verbose
+    def __init__(self, args):
+        self.verbose = args.verbose
 
-    def init_discriminator(self, input_var=None):
+    def init_discriminator(self, first_layer, input_var=None):
         """
         Initialize the DCGAN discriminator network using lasagne
         Returns the network
@@ -302,25 +302,25 @@ class DCGAN:
         layers.append(l_in)
 
         l_1 = lyr.Conv2DLayer(
-            incoming=l_in, num_filters=64, filter_size=5, stride=2, pad=2,
+            incoming=l_in, num_filters=first_layer, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         )
         layers.append(l_1)
 
         l_2 = lyr.batch_norm(lyr.Conv2DLayer(
-            incoming=l_1, num_filters=128, filter_size=5, stride=2, pad=2,
+            incoming=l_1, num_filters=first_layer*2, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         ))
         layers.append(l_2)
 
         l_3 = lyr.batch_norm(lyr.Conv2DLayer(
-            incoming=l_2, num_filters=256, filter_size=5, stride=2, pad=2,
+            incoming=l_2, num_filters=first_layer*4, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         ))
         layers.append(l_3)
 
         l_4 = lyr.batch_norm(lyr.Conv2DLayer(
-            incoming=l_3, num_filters=512, filter_size=5, stride=2, pad=2,
+            incoming=l_3, num_filters=first_layer*8, filter_size=5, stride=2, pad=2,
             nonlinearity=lrelu
         ))
         l_4 = lyr.FlattenLayer(l_4)
@@ -339,7 +339,7 @@ class DCGAN:
         return l_out
 
 
-    def init_generator(self, input_var=None):
+    def init_generator(self, first_layer, input_var=None):
         """
         Initialize the DCGAN generator network using lasagne
         Returns the network
@@ -351,7 +351,7 @@ class DCGAN:
         layers.append(l_in)
 
         l_1 = lyr.batch_norm(lyr.DenseLayer(
-            incoming=l_in, num_units=4*4*512, nonlinearity=nonlinearities.rectify
+            incoming=l_in, num_units=4*4*first_layer*8, nonlinearity=nonlinearities.rectify
         ))
         l_1 = lyr.ReshapeLayer(
             incoming=l_1, shape=(-1, 512, 4, 4)
@@ -359,21 +359,21 @@ class DCGAN:
         layers.append(l_1)
 
         l_2 = lyr.batch_norm(lyr.Deconv2DLayer(
-            incoming=l_1, num_filters=256, filter_size=5, stride=2, crop=2,
+            incoming=l_1, num_filters=first_layer*4, filter_size=5, stride=2, crop=2,
             output_size=8,
             nonlinearity=nonlinearities.rectify
         ))
         layers.append(l_2)
 
         l_3 = lyr.batch_norm(lyr.Deconv2DLayer(
-            incoming=l_2, num_filters=128, filter_size=5, stride=2, crop=2,
+            incoming=l_2, num_filters=first_layer*2, filter_size=5, stride=2, crop=2,
             output_size=16,
             nonlinearity=nonlinearities.rectify
         ))
         layers.append(l_3)
 
         l_4 = lyr.batch_norm(lyr.Deconv2DLayer(
-            incoming=l_3, num_filters=64, filter_size=5, stride=2, crop=2,
+            incoming=l_3, num_filters=first_layer, filter_size=5, stride=2, crop=2,
             output_size=32,
             nonlinearity=nonlinearities.rectify
         ))
