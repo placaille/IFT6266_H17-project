@@ -188,6 +188,19 @@ def gen_pics_gan(preds, epoch, show=False, save=False, tanh=True):
             print 'images were saved to %s' % path
 
 
+def dump_objects_output(object, filename):
+    """
+    Dumps any object using pickle into ./output directory
+    """
+    path = os.path.join(os.getcwd(), 'output')
+    if not os.path.exists(path):
+        os.makedirs(path)
+    full_path = os.path.join(path, filename)
+    with open(full_path, 'wb') as f:
+        pkl.dump(object, f)
+    print 'Object saved to file %s' % filename
+
+
 def save_model(network, filename):
     """
     Saves the parameters of a model to a pkl file
