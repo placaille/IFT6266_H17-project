@@ -28,7 +28,7 @@ def gen_theano_fn(args):
 
     # Build generator and discriminator
     dc_gan = models.DCGAN(args)
-    generator = dc_gan.init_generator(first_layer=128, input_var=None)
+    generator = dc_gan.init_generator(first_layer=64, input_var=None)
     discriminator = dc_gan.init_discriminator(first_layer=128, input_var=None)
 
     # Get images from generator (for training and outputing images)
@@ -60,7 +60,7 @@ def gen_theano_fn(args):
     updates_discr = lasagne.updates.adam(
         loss_discr, params_discr, learning_rate=0.001, beta1=0.9)
     updates_gener = lasagne.updates.adam(
-        loss_gener, params_gener, learning_rate=0.001, beta1=0.6)
+        loss_gener, params_gener, learning_rate=0.0005, beta1=0.6)
 
     if args.verbose:
         print 'Networks created.'
@@ -84,14 +84,13 @@ def main():
 
     args = utils.get_args()
 
+    # Settings for training
     BATCH_SIZE = 128
     NB_EPOCHS = args.epochs  # default 25
     NB_GEN = args.gen  # default 5
     EARLY_STOP_LIMIT = 10
-    NB_TRAIN = 82782
-    NB_VALID = 40504
-    GEN_TRAIN_DELAY = 5
-    GEN_TRAIN_LOOPS = 3
+    GEN_TRAIN_DELAY = 30
+    GEN_TRAIN_LOOPS = 10
 
     if args.verbose:
         BATCH_PRINT_DELAY = 1
@@ -143,6 +142,10 @@ def main():
         epoch_loss = 0
         num_batch = 0
         t_epoch = time.time()
+        d_batch_loss = 0
+        g_batch_loss = 0
+        steps_loss_g = [] # will store every loss of generator
+        steps_loss_d = [] # will store every loss of discriminator
 
         # iterate of split datasets
         for file_id in np.random.choice(NB_TRAIN_FILES, NB_TRAIN_FILES, replace=False):
@@ -164,25 +167,34 @@ def main():
             for batch_idx in schemes_train.get_request_iterator():
 
                 # generate batch of uniform samples
-                rdm_d = np.random.uniform(0, 1., size=(len(batch_idx), 100))
+                rdm_d = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
                 rdm_d = rdm_d.astype(theano.config.floatX)
 
                 # train with a minibatch on discriminator
                 d_batch_loss = train_discr(train_full[batch_idx], rdm_d)
+
+                steps_loss_d.append(d_batch_loss)
+                steps_loss_g.append(g_batch_loss)
+
+                if num_batch % BATCH_PRINT_DELAY == 0:
+                    print '- train discr batch %s, loss %s' % (num_batch, np.round(d_batch_loss, 4))
 
                 if num_batch % GEN_TRAIN_DELAY == 0:
 
                     for _ in xrange(GEN_TRAIN_LOOPS):
 
                         # generate batch of uniform samples
-                        rdm_g = np.random.uniform(0, 1., size=(len(batch_idx), 100))
+                        rdm_g = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
                         rdm_g = rdm_g.astype(theano.config.floatX)
 
                         # train with a minibatch on generator
                         g_batch_loss = train_gen(rdm_g)
 
-                if num_batch % BATCH_PRINT_DELAY == 0:
-                    print '- train batch %s, loss (d, g) (%s, %s)' % (num_batch, np.round(d_batch_loss, 4), np.round(g_batch_loss, 4))
+                        steps_loss_d.append(d_batch_loss)
+                        steps_loss_g.append(g_batch_loss)
+
+                        if num_batch % BATCH_PRINT_DELAY == 0:
+                            print '- train gen step %s, loss %s' %(_+1, np.round(g_batch_loss, 4))
 
                 epoch_loss += d_batch_loss + g_batch_loss
                 num_batch += 1
@@ -199,7 +211,7 @@ def main():
         print '- Epoch train (loss %s) in %s sec' % (train_loss[i], round(time.time() - t_epoch))
 
         # generate some random images
-        gen_noise = np.random.uniform(0, 1., size=(NB_GEN, 100))
+        gen_noise = np.random.uniform(-1., 1., size=(NB_GEN, 100))
         gen_noise = gen_noise.astype(theano.config.floatX)
         preds_gen, probs_discr = predict(gen_noise)
 
@@ -208,8 +220,10 @@ def main():
 
         # save the images
         utils.gen_pics_gan(preds_gen, i, show=False, save=True, tanh=False)
-        utils.gen_pics_gan(train_full[batch_idx], 888, show=False, save=True, tanh=False)
+        utils.gen_pics_gan(train_full[:5], 888, show=False, save=True, tanh=False)
 
+        # save losses at each step
+        utils.dump_objects_output((steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
 
         # # Validation only done on couple of images for speed
         # inputs_val, targts_val, capts_val, color_count_val = utils.get_batch_data(
