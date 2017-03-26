@@ -193,14 +193,12 @@ def main():
                 epoch_loss += d_batch_loss + g_batch_loss
                 num_batch += 1
 
-
         train_loss.append(np.round(epoch_loss, 4))
 
-        if args.save:
+        if args.save > 0 and i % args.save == 0:
             discriminator, generator = model
             utils.save_model(args, discriminator, 'discrminator_epoch_%s.pkl' % i)
             utils.save_model(args, generator, 'generator_epoch_%s.pkl' % i)
-
 
         print '- Epoch train (loss %s) in %s sec' % (train_loss[i], round(time.time() - t_epoch))
 
