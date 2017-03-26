@@ -63,24 +63,16 @@ def get_batch_data(batch_idx,
     return returns
 
 
-def load_preprocessed_info(path):
+def get_preprocessed_files(path):
+    """
+    returns arrays of preprocessed data files
+    """
 
     full_files = np.asarray(sorted(glob.glob(path + '/*_full.npy')))
     cter_files = np.asarray(sorted(glob.glob(path + '/*_cter.npy')))
     capt_files = np.asarray(sorted(glob.glob(path + '/*_capt.pkl')))
 
-    full_nb = []
-    cter_nb = []
-    capt_nb = []
-
-    for full, cter, capt in zip(full_files, cter_files, capt_files):
-        full_nb = np.load(open(full, 'r')).shape[0]
-        cter_nb = np.load(open(cter, 'r')).shape[0]
-        capt_nb = len(pkl.load(open(capt, 'rb')))
-
-        assert full_nb == cter_nb == capt_nb, 'nb of elements don\'t match (full%s, cter%s, capt%s)' %(full_nb, cter_nb, capt_nb)
-
-    return (full_files, full_nb), (cter_files, cter_nb), (capt_files, capt_nb)
+    return full_files, cter_files, capt_files
 
 
 def get_preprocessed_batch_data(batch_idx,

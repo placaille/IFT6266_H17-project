@@ -107,19 +107,11 @@ def main():
     train_discr, train_gen, predict, model = theano_fn
 
     # get different file names for the split data set
-    train_full_files = np.asarray(
-        sorted(glob.glob(train_path + '/*_full.npy')))
-    train_cter_files = np.asarray(
-        sorted(glob.glob(train_path + '/*_cter.npy')))
-    train_capt_files = np.asarray(
-        sorted(glob.glob(train_path + '/*_capt.pkl')))
+    train_files = utils.get_preprocessed_files(train_path)
+    train_full_files, train_cter_files, train_capt_files = train_files
 
-    valid_full_files = np.asarray(
-        sorted(glob.glob(valid_path + '/*_full.npy')))
-    valid_cter_files = np.asarray(
-        sorted(glob.glob(valid_path + '/*_cter.npy')))
-    valid_capt_files = np.asarray(
-        sorted(glob.glob(valid_path + '/*_capt.pkl')))
+    valid_files = utils.get_preprocessed_files(valid_path)
+    valid_full_files, valid_cter_files, valid_capt_files = valid_files
 
     NB_TRAIN_FILES = len(train_full_files)
     NB_VALID_FILES = len(valid_full_files)
@@ -151,11 +143,10 @@ def main():
         for file_id in np.random.choice(NB_TRAIN_FILES, NB_TRAIN_FILES, replace=False):
 
             t_load = time.time()
+
             # load file
-            train_full = np.load(open(train_full_files[file_id], 'r')).astype(
-                theano.config.floatX)
-            # train_cter = np.load(open(train_cter_files[file_id], 'r')).astype(theano.config.floatX)
-            # train_capt = pkl.load(open(train_capt_files[file_id], 'rb')).astype(theano.config.floatX)
+            with open(train_full_files[file_id], 'r') as f:
+                train_full = np.load(f).astype(theano.config.floatX)
 
             if args.verbose:
                 print 'file %s loaded in %s sec' % (train_full_files[file_id], round(time.time() - t_load, 0))
