@@ -245,6 +245,8 @@ def main():
 
     print 'Training completed.'
 
+    if args.mila:
+        utils.move_results_from_local()
     # print 'Best performance -- Epoch #%s' % (best_epoch_idx + 1)
     # print '- Train %s' % (train_loss[best_epoch_idx])
     # print '- Valid %s' % (valid_loss[best_epoch_idx])

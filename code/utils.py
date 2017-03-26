@@ -92,7 +92,6 @@ def get_preprocessed_batch_data(batch_idx,
     return returns
 
 
-
 def init_dataset(args, dataset_name):
     """
     If running from MILA, copy on /Tmp/lacaillp/datasets/
@@ -118,6 +117,7 @@ def init_dataset(args, dataset_name):
         print 'Copy completed.'
 
     return dst_dir + dataset_name
+
 
 def gen_pics(inputs, targts, preds, epoch, show=False, save=False):
     """
@@ -242,6 +242,32 @@ def reload_model(args, network, filename):
         lyr.set_all_param_values(network, values)
         print 'Network was successfully loaded from %s' % full_path
         return network
+
+
+def move_results_from_local():
+    """
+    Copy results stored on Tmp/lacaillp/output to Tmp/lacaillp/lisatmp3.
+    Used at end of run. If successful, deletes the local results
+    """
+
+    src_dir = '/Tmp/lacaillp/output/'
+    dst_dir = '/data/lisatmp3/lacaillp/output/'
+
+    if not os.path.exists(src_dir):
+        print '%s doesn\'t exist, nothing was copied.'
+    else:
+
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
+
+        try:
+            shutil.copytree(src_dir, dst_dir)
+        except:
+            'Copy of data wasn\'t successful, local data was not deleted.
+        else:
+            print 'Copy of data to %s was successful, deleting local copy...' % dst_dir
+            shutil.rmtree(src_dir)
+            print 'Local data was deleted. dir = %s' src_dir
 
 
 def get_args():
