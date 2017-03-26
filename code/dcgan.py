@@ -124,7 +124,10 @@ def main():
 
     if not args.reload == None:
         discriminator, generator = model
-        utils.reload_model(discriminator, model, args.reload)
+        file_discr = 'discrminator_epoch_%s.pkl' % args.reload
+        file_gen = 'generator_epoch_%s.pkl' % args.reload
+        discriminator = utils.reload_model(args, discriminator, file_discr)
+        generator = utils.reload_model(args, generator, file_gen)
 
     for i in xrange(NB_EPOCHS):
 
@@ -195,8 +198,8 @@ def main():
 
         if args.save:
             discriminator, generator = model
-            utils.save_model(discriminator, 'discrminator_epoch_%s.pkl' % i)
-            utils.save_model(generator, 'generator_epoch_%s.pkl' % i)
+            utils.save_model(args, discriminator, 'discrminator_epoch_%s.pkl' % i)
+            utils.save_model(args, generator, 'generator_epoch_%s.pkl' % i)
 
 
         print '- Epoch train (loss %s) in %s sec' % (train_loss[i], round(time.time() - t_epoch))
@@ -210,11 +213,11 @@ def main():
             print 'Discriminator prob(real):', probs_discr
 
         # save the images
-        utils.gen_pics_gan(preds_gen, i, show=False, save=True, tanh=False)
-        utils.gen_pics_gan(train_full[:5], 888, show=False, save=True, tanh=False)
+        utils.gen_pics_gan(args, preds_gen, i, show=False, save=True, tanh=False)
+        utils.gen_pics_gan(args, train_full[:5], 888, show=False, save=True, tanh=False)
 
         # save losses at each step
-        utils.dump_objects_output((steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
+        utils.dump_objects_output(args, (steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
 
         # # Validation only done on couple of images for speed
         # inputs_val, targts_val, capts_val, color_count_val = utils.get_batch_data(

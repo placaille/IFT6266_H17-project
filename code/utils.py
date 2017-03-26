@@ -154,7 +154,7 @@ def gen_pics(inputs, targts, preds, epoch, show=False, save=False):
                 pred_im.show(title='img_epoch_%s_id_%s_pred' % (epoch + 1, i))
 
 
-def gen_pics_gan(preds, epoch, show=False, save=False, tanh=True):
+def gen_pics_gan(args, preds, epoch, show=False, save=False, tanh=True):
     """
     Generates and/or save image out of array using PIL
     """
@@ -168,7 +168,12 @@ def gen_pics_gan(preds, epoch, show=False, save=False, tanh=True):
                 pred = np.transpose(pred, axes=(1, 2, 0))
             pred_im = Image.fromarray(np.uint8(pred * 255))
             if save:
-                path = os.path.join(os.getcwd(), 'output')
+
+                if args.mila:
+                    path = '/Tmp/lacaillp/output/images/'
+                elif args.laptop:
+                    path = '/Users/phil/output/images/'
+
                 if not os.path.exists(path):
                     os.makedirs(path)
                 pred_im.save(os.path.join(path, 'img_epoch_%s_id_%s_pred.jpg' % (epoch + 1, i)))
@@ -180,39 +185,53 @@ def gen_pics_gan(preds, epoch, show=False, save=False, tanh=True):
             print 'images were saved to %s' % path
 
 
-def dump_objects_output(object, filename):
+def dump_objects_output(args, object, filename):
     """
-    Dumps any object using pickle into ./output directory
+    Dumps any object using pickle into ./output/objects_dump/ directory
     """
-    path = os.path.join(os.getcwd(), 'output')
+    if args.mila:
+        path = '/Tmp/lacaillp/output/objects_dump/'
+    elif args.laptop:
+        path = '/Users/phil/output/objects_dump/'
+
     if not os.path.exists(path):
         os.makedirs(path)
+
     full_path = os.path.join(path, filename)
     with open(full_path, 'wb') as f:
         pkl.dump(object, f)
     print 'Object saved to file %s' % filename
 
 
-def save_model(network, filename):
+def save_model(args, network, filename):
     """
     Saves the parameters of a model to a pkl file
-    Will try to get save it in './saved_models', otherwise will create it
+    Will try to get save it in './output/saved_models', otherwise will create it
     """
-    path = os.path.join(os.getcwd(), 'saved_models')
+    if args.mila:
+        path = '/Tmp/lacaillp/output/saved_models/'
+    elif args.laptop:
+        path = '/Users/phil/output/saved_models/'
+
     if not os.path.exists(path):
         os.makedirs(path)
+
     full_path = os.path.join(path, filename)
     with open(full_path, 'wb') as f:
         pkl.dump(lyr.get_all_param_values(network), f)
     print 'Model saved to file %s' % filename
 
 
-def reload_model(network, filename):
+def reload_model(args, network, filename):
     """
     Returns the network loaded of the parameters
-    Will try to get filename in './saved_models'
+    Will try to get filename in './output/saved_models'
     """
-    path = os.path.join(os.getcwd(), 'saved_models')
+    if args.mila:
+        path = '/Tmp/lacaillp/output/saved_models/'
+    elif args.laptop:
+        path = '/Users/phil/output/saved_models/'
+
     full_path = os.path.join(path, filename)
     try:
         with open(full_path, 'rb') as f:
@@ -222,6 +241,7 @@ def reload_model(network, filename):
     else:
         lyr.set_all_param_values(network, values)
         print 'Network was successfully loaded from %s' % full_path
+        return network
 
 
 def get_args():
