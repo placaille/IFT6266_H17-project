@@ -115,7 +115,7 @@ def reconstruct_img(images_full, corr_mask, reconstr_fn):
     """
 
     preds = np.array([])
-    images_corr = np.product((images_full, mask_corr))
+    images_corr = np.product((images_full, corr_mask))
     print 'corrupted_image shape', images_corr.shape
 
     for image_corr in images_corr:
@@ -124,7 +124,7 @@ def reconstruct_img(images_full, corr_mask, reconstr_fn):
         print 'reconstr_loss', reconstr_loss
         preds = np.append(preds, prediction)
 
-    reconstr_images = mask_corr * images_corr + (1.0 - mask_corr) * preds
+    reconstr_images = corr_mask * images_corr + (1.0 - corr_mask) * preds
 
     return reconstr_images
 
