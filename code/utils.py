@@ -180,7 +180,7 @@ def save_pics_gan(args, images, save_code, show=False, save=False, tanh=True):
                 img = (np.transpose(img, axes=(1, 2, 0)) + 1) / 2.0
             else:
                 img = np.transpose(img, axes=(1, 2, 0))
-            image = Image.fromarray(np.uint8(pred * 255))
+            image = Image.fromarray(np.uint8(img * 255))
             if save:
 
                 if args.mila:

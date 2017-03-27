@@ -23,10 +23,10 @@ def gen_theano_fn(args):
         print 'Creating networks...'
 
     # Setup input variables
-    inpt_noise = T.matrix()
-    inpt_image = T.tensor4()
-    corr_mask = T.matrix() # corruption mask
-    corr_image = T.tensor4()
+    inpt_noise = T.matrix('inpt_noise')
+    inpt_image = T.tensor4('inpt_image')
+    corr_mask = T.matrix('corr_mask') # corruption mask
+    corr_image = T.tensor4('corr_image')
 
     # Shared variable for image reconstruction
     reconstr_noise = theano.shared(
@@ -73,15 +73,15 @@ def gen_theano_fn(args):
 
     # Contextual and perceptual loss for
     contx_loss = lasagne.objectives.squared_error(
-        image_reconstr * corr_mask, corr_image * corr_mask)
-    prcpt_loss = T.log(1.0 - probs_reconstr)
+        image_reconstr * corr_mask, corr_image * corr_mask).mean()
+    prcpt_loss = T.log(1.0 - probs_reconstr).mean()
 
     # Total loss
     lbda = 0.0001
-    reconstr_loss = T.mean(contx_loss + lbda * prcpt_loss)
+    reconstr_loss = contx_loss + lbda * prcpt_loss
 
     # Set update rule that will change the input noise
-    # reconstr_updates = lasagne.updates.sgd(reconstr_loss, reconstr_noise, 0.0001)
+    #reconstr_updates = lasagne.updates.sgd(reconstr_loss, reconstr_noise, 0.0001)
     grad = T.grad(reconstr_loss, reconstr_noise)
     lr = 0.001
     update_rule = reconstr_noise - lr * grad
@@ -100,7 +100,8 @@ def gen_theano_fn(args):
     predict = theano.function([inpt_noise], [image_fake_det, probs_fake_det])
     print '- 3 of 4 compiled.'
     reconstr = theano.function(
-        [corr_image, corr_mask], [reconstr_noise, image_reconstr, reconstr_loss], updates=[(reconstr_noise, update_rule)])
+        [corr_image, corr_mask], [reconstr_noise, image_reconstr, reconstr_loss])#), updates=[(reconstr_noise, update_rule)])
+    #reconstr = theano.function([corr_image, corr_mask], [reconstr_noise, image_reconstr, corr_image, corr_mask, reconstr_loss])
     print '- 4 of 4 compiled.'
     print 'compiled.'
 
@@ -114,19 +115,25 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn):
     mask_corr: matrix that is applied to make the image corrupted
     """
 
-    preds = np.array([])
+    preds = np.ones((images_full.shape[0], 3, 64, 64))
     images_corr = np.product((images_full, mask_corr))
+    print 'images corr shape', images_corr.shape
 
-    for image_corr in images_corr:
+    for i, image_corr in enumerate(images_corr):
+	image_corr = np.expand_dims(image_corr, axis=0)
         print 'corr image shape', image_corr.shape
         print 'corr mask shape', mask_corr.shape
         reconstr_out = reconstr_fn(image_corr, mask_corr)
         reconstr_noise, prediction, reconstr_loss = reconstr_out
-        print 'reconstr_loss', reconstr_loss
-        preds = np.append(preds, prediction)
+        #reconstr_noise, prediction, _, __, contx_loss  = reconstr_out
+	print 'prediction shape', prediction.shape
+	#print 'contx loss', contx_loss
+	print 'reconstr_loss', reconstr_loss
+        preds[i] = prediction[0]
 
+    print 'preds shape', preds.shape
     reconstr_images = mask_corr * images_corr + (1.0 - mask_corr) * preds
-
+    print 'reconstr_images shape', reconstr_images.shape
     return reconstr_images
 
 
