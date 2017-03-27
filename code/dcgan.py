@@ -73,7 +73,7 @@ def gen_theano_fn(args):
 
     # Contextual and perceptual loss for
     contx_loss = lasagne.objectives.squared_error(
-        corr_mask * image_reconstr, corr_mask * corr_image)
+        image_reconstr * corr_mask, corr_image * corr_mask)
     prcpt_loss = T.log(1.0 - probs_reconstr)
 
     # Total loss
@@ -107,7 +107,7 @@ def gen_theano_fn(args):
     return train_d, train_g, predict, reconstr, (discriminator, generator)
 
 
-def reconstruct_img(images_full, corr_mask, reconstr_fn):
+def reconstruct_img(images_full, mask_corr, reconstr_fn):
     """
     Reconstructs the image
     ---
@@ -115,16 +115,17 @@ def reconstruct_img(images_full, corr_mask, reconstr_fn):
     """
 
     preds = np.array([])
-    images_corr = np.product((images_full, corr_mask))
-    print 'corrupted_image shape', images_corr.shape
+    images_corr = np.product((images_full, mask_corr))
 
     for image_corr in images_corr:
-        reconstr_out = reconstr_fn(image_corr, corr_mask)
+        print 'corr image shape', image_corr.shape
+        print 'corr mask shape', mask_corr.shape
+        reconstr_out = reconstr_fn(image_corr, mask_corr)
         reconstr_noise, prediction, reconstr_loss = reconstr_out
         print 'reconstr_loss', reconstr_loss
         preds = np.append(preds, prediction)
 
-    reconstr_images = corr_mask * images_corr + (1.0 - corr_mask) * preds
+    reconstr_images = mask_corr * images_corr + (1.0 - mask_corr) * preds
 
     return reconstr_images
 
