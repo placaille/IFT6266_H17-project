@@ -7,6 +7,7 @@ import numpy as np
 import theano
 import lasagne.layers as lyr
 import argparse
+from distutils.dir_util import copy_tree
 
 def get_batch_data(batch_idx,
                    # PATH need to be fixed
@@ -113,7 +114,7 @@ def init_dataset(args, dataset_name):
     if not os.path.exists(dst_dir + dataset_name):
         print 'Dataset not stored locally, copying %s to %s...' \
             % (dataset_name, dst_dir)
-        shutil.copytree(src_dir + dataset_name, dst_dir + dataset_name)
+        shutil.copytree(src_dir + dataset_name, dst_dir + dataset_name, )
         print 'Copy completed.'
 
     return dst_dir + dataset_name
@@ -261,13 +262,13 @@ def move_results_from_local():
             os.makedirs(dst_dir)
 
         try:
-            shutil.copytree(src_dir, dst_dir)
+            copy_tree(src_dir, dst_dir)
         except:
-            'Copy of data wasn\'t successful, local data was not deleted.
+            print 'Copy of data wasn\'t successful, local data was not deleted.'
         else:
-            print 'Copy of data to %s was successful, deleting local copy...' % dst_dir
+            print 'Copy of data to %s was successful, local copy was deleted.' % dst_dir
             shutil.rmtree(src_dir)
-            print 'Local data was deleted. dir = %s' src_dir
+            print 'Local data was deleted. dir = %s' % src_dir
 
 
 def get_args():
