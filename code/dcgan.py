@@ -25,6 +25,12 @@ def gen_theano_fn(args):
     # Setup input variables
     inpt_noise = T.matrix()
     inpt_image = T.tensor4()
+    corr_mask = T.matrix() # corruption mask
+    corr_image = T.tensor3()
+
+    # Shared variable for image reconstruction
+    reconstr_noise = theano.shared(
+        np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
 
     # Build generator and discriminator
     dc_gan = models.DCGAN(args)
@@ -34,12 +40,15 @@ def gen_theano_fn(args):
     # Get images from generator (for training and outputing images)
     image_fake = lyr.get_output(generator, inputs=inpt_noise)
     image_fake_det = lyr.get_output(generator, inputs=inpt_noise, deterministic=True)
+    image_reconstr = lyr.get_output(generator, inputs=reconstr_noise, deterministic=True)
 
     # Get probabilities from discriminator
     probs_real = lyr.get_output(discriminator, inputs=inpt_image)
     probs_fake = lyr.get_output(discriminator, inputs=image_fake)
     probs_fake_det = lyr.get_output(
         discriminator, inputs=image_fake_det, deterministic=True)
+    probs_reconstr = lyr.get_output(
+        discriminator, inputs=image_reconstr, deterministic=True)
 
     # Calc loss for discriminator
     # minimize prob of error on true images
@@ -62,6 +71,19 @@ def gen_theano_fn(args):
     updates_gener = lasagne.updates.adam(
         loss_gener, params_gener, learning_rate=0.0005, beta1=0.6)
 
+    # Contextual and perceptual loss for
+    contx_loss = lasagne.objectives.squared_error(
+        (1.0 - corr_mask) * image_reconstr, (1.0 - corr_mask) * corr_image)
+    prcpt_loss = T.log(1.0 - probs_reconstr)
+
+    # Total loss
+    reconstr_loss = T.mean(contx_loss + 0.0001 * prcpt_loss)
+
+    # Set update rule that will change the input noise
+    # reconstr_updates = lasagne.updates.sgd(reconstr_loss, reconstr_noise, 0.0001)
+    grad = T.grad(reconstr_loss, reconstr_noise)
+
+
     if args.verbose:
         print 'Networks created.'
 
@@ -69,15 +91,18 @@ def gen_theano_fn(args):
     print 'compiling...'
     train_d = theano.function(
         [inpt_image, inpt_noise], loss_discr, updates=updates_discr)
-    print '- 1 of 3 compiled.'
+    print '- 1 of 4 compiled.'
     train_g = theano.function(
         [inpt_noise], loss_gener, updates=updates_gener)
-    print '- 2 of 3 compiled.'
+    print '- 2 of 4 compiled.'
     predict = theano.function([inpt_noise], [image_fake_det, probs_fake_det])
-    print '- 3 of 3 compiled.'
+    print '- 3 of 4 compiled.'
+    reconstr = theano.function(
+        [corr_image, corr_mask], [image_reconstr, reconstr_loss], updates=[(reconstr_noise, reconstr_noise - grad)])
+    print '- 4 of 4 compiled.'
     print 'compiled.'
 
-    return train_d, train_g, predict, (discriminator, generator)
+    return train_d, train_g, predict, reconstr, (discriminator, generator)
 
 
 def main():
@@ -104,7 +129,7 @@ def main():
 
     # build network and get theano functions for training
     theano_fn = gen_theano_fn(args)
-    train_discr, train_gen, predict, model = theano_fn
+    train_discr, train_gen, predict, reconstr, model = theano_fn
 
     # get different file names for the split data set
     train_files = utils.get_preprocessed_files(train_path)
