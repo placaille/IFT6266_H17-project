@@ -80,7 +80,7 @@ def get_corruption_mask():
     """
     returns the corruption mask (when multiplied by image, makes it corrupted)
     """
-    corruption_mask = np.ones(shape=(1, 1, 64, 64)).astype(theano.config.floatX)
+    corruption_mask = np.ones(shape=(64, 64)).astype(theano.config.floatX)
     center = (
         int(np.floor(corruption_mask.shape[0] / 2.)),
         int(np.floor(corruption_mask.shape[1] / 2.)))
