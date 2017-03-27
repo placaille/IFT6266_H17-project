@@ -76,6 +76,18 @@ def get_preprocessed_files(path):
     return full_files, cter_files, capt_files
 
 
+def get_corruption_mask():
+    """
+    returns the corruption mask (when multiplied by image, makes it corrupted)
+    """
+    corruption_mask = np.ones(shape=(64, 64))
+    center = (
+        int(np.floor(corruption_mask.shape[0] / 2.)),
+        int(np.floor(corruption_mask.shape[1] / 2.)))
+    corruption_mask[center[0] - 16:center[0] + 16,
+                    center[1] - 16:center[1] + 16] = 0
+    return corruption_mask
+
 def get_preprocessed_batch_data(batch_idx,
                    # PATH need to be fixed
                    path="/Tmp/inpainting/", split="train2014"):
