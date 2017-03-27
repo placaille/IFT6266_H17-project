@@ -88,6 +88,7 @@ def get_corruption_mask():
                     center[1] - 16:center[1] + 16] = 0
     return corruption_mask
 
+
 def get_preprocessed_batch_data(batch_idx,
                    # PATH need to be fixed
                    path="/Tmp/inpainting/", split="train2014"):

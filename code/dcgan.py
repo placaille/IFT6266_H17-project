@@ -260,7 +260,7 @@ def main():
         # Reconstruct images from valid set
 
         # choose random valid file
-        valid_file_id = np.random.choice(NB_VALID_FILES, 1):
+        valid_file_id = np.random.choice(NB_VALID_FILES, 1)
 
         # load file
         with open(valid_full_files[valid_file_id], 'r') as f:
@@ -269,12 +269,13 @@ def main():
         # pick a given number of images from that file
         batch_valid = np.random.choice(len(valid_full), NB_GEN, replace=False)
 
-        for img in valid_full[batch_valid]:
+        # reconstruct image
+        img_uncorrpt = valid_full[batch_valid]
+        img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn)
 
-            img_reconstr = reconstruct_img(image_full, corruption_mask, reconstr_fn)
-
-            utils.save_pics_gan(args, preds_gen, 'pred_epoch_%s' %(i+1), show=False, save=True, tanh=False)
-            utils.save_pics_gan(args, train_full[:5], 'true_epoch_%s' %(i+1), show=False, save=True, tanh=False)
+        # save images
+        utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' %(i+1), show=False, save=True, tanh=False)
+        utils.save_pics_gan(args, img_uncorrpt, 'true_epoch_%s' %(i+1), show=False, save=True, tanh=False)
 
         # save losses at each step
         utils.dump_objects_output(args, (steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
