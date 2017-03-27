@@ -100,8 +100,7 @@ def gen_theano_fn(args):
     predict = theano.function([inpt_noise], [image_fake_det, probs_fake_det])
     print '- 3 of 4 compiled.'
     reconstr = theano.function(
-        [corr_image, corr_mask], [reconstr_noise, image_reconstr, reconstr_loss])#), updates=[(reconstr_noise, update_rule)])
-    #reconstr = theano.function([corr_image, corr_mask], [reconstr_noise, image_reconstr, corr_image, corr_mask, reconstr_loss])
+        [corr_image, corr_mask], [reconstr_noise, image_reconstr, reconstr_loss], updates=[(reconstr_noise, update_rule)])
     print '- 4 of 4 compiled.'
     print 'compiled.'
 
@@ -120,20 +119,15 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn):
     print 'images corr shape', images_corr.shape
 
     for i, image_corr in enumerate(images_corr):
-	image_corr = np.expand_dims(image_corr, axis=0)
-        print 'corr image shape', image_corr.shape
-        print 'corr mask shape', mask_corr.shape
-        reconstr_out = reconstr_fn(image_corr, mask_corr)
-        reconstr_noise, prediction, reconstr_loss = reconstr_out
-        #reconstr_noise, prediction, _, __, contx_loss  = reconstr_out
-	print 'prediction shape', prediction.shape
-	#print 'contx loss', contx_loss
-	print 'reconstr_loss', reconstr_loss
+	    image_corr = np.expand_dims(image_corr, axis=0)
+        delta = float('inf')
+        while delta > 0.0001
+            reconstr_out = reconstr_fn(image_corr, mask_corr)
+            reconstr_noise, prediction, reconstr_loss = reconstr_out
+            print 'reconstr_loss', reconstr_loss
         preds[i] = prediction[0]
 
-    print 'preds shape', preds.shape
     reconstr_images = mask_corr * images_corr + (1.0 - mask_corr) * preds
-    print 'reconstr_images shape', reconstr_images.shape
     return reconstr_images
 
 
@@ -252,33 +246,6 @@ def main():
                 epoch_loss += d_batch_loss + g_batch_loss
                 num_batch += 1
 
-                ##############
-                #to deleete
-                file_id = np.random.choice(NB_VALID_FILES, 1)
-
-                # load file
-                with open(valid_full_files[file_id], 'r') as f:
-                    valid_full = np.load(f).astype(theano.config.floatX)
-
-                t_load = time.time()
-
-                if args.verbose:
-                    print 'file %s loaded in %s sec' % (valid_full_files[file_id], round(time.time() - t_load, 0))
-
-                # pick a given number of images from that file
-                batch_valid = np.random.choice(len(valid_full), NB_GEN, replace=False)
-                print 'batch valid', batch_valid
-
-                # reconstruct image
-                img_uncorrpt = valid_full[batch_valid]
-                img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn)
-
-                # save images
-                utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' %(i+1), show=False, save=True, tanh=False)
-                utils.save_pics_gan(args, img_uncorrpt, 'true_epoch_%s' %(i+1), show=False, save=True, tanh=False)
-
-                ###
-                #################
         train_loss.append(np.round(epoch_loss, 4))
 
         if args.save > 0 and i % args.save == 0:
@@ -296,7 +263,28 @@ def main():
 
         # Reconstruct images from valid set
         # choose random valid file
+        file_id = np.random.choice(NB_VALID_FILES, 1)
 
+        # load file
+        with open(valid_full_files[file_id], 'r') as f:
+            valid_full = np.load(f).astype(theano.config.floatX)
+
+        t_load = time.time()
+
+        if args.verbose:
+            print 'file %s loaded in %s sec' % (valid_full_files[file_id], round(time.time() - t_load, 0))
+
+        # pick a given number of images from that file
+        batch_valid = np.random.choice(len(valid_full), NB_GEN, replace=False)
+        print 'batch valid', batch_valid
+
+        # reconstruct image
+        img_uncorrpt = valid_full[batch_valid]
+        img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn)
+
+        # save images
+        utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' %(i+1), show=False, save=True, tanh=False)
+        utils.save_pics_gan(args, img_uncorrpt, 'true_epoch_%s' %(i+1), show=False, save=True, tanh=False)
 
         # save losses at each step
         utils.dump_objects_output(args, (steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
