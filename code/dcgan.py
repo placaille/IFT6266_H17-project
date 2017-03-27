@@ -29,7 +29,7 @@ def gen_theano_fn(args):
     corr_image = T.tensor4('corr_image')
 
     # Shared variable for image reconstruction
-    reconstr_noise = theano.shared(
+    reconstr_noise_shrd = theano.shared(
         np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
 
     # Build generator and discriminator
@@ -40,7 +40,7 @@ def gen_theano_fn(args):
     # Get images from generator (for training and outputing images)
     image_fake = lyr.get_output(generator, inputs=inpt_noise)
     image_fake_det = lyr.get_output(generator, inputs=inpt_noise, deterministic=True)
-    image_reconstr = lyr.get_output(generator, inputs=reconstr_noise, deterministic=True)
+    image_reconstr = lyr.get_output(generator, inputs=reconstr_noise_shrd, deterministic=True)
 
     # Get probabilities from discriminator
     probs_real = lyr.get_output(discriminator, inputs=inpt_image)
@@ -82,9 +82,9 @@ def gen_theano_fn(args):
 
     # Set update rule that will change the input noise
     #reconstr_updates = lasagne.updates.sgd(reconstr_loss, reconstr_noise, 0.0001)
-    grad = T.grad(reconstr_loss, reconstr_noise)
-    lr = 0.001
-    update_rule = reconstr_noise - lr * grad
+    grad = T.grad(reconstr_loss, reconstr_noise_shrd)
+    lr = 1.0
+    update_rule = reconstr_noise_shrd - lr * grad
 
     if args.verbose:
         print 'Networks created.'
@@ -100,14 +100,15 @@ def gen_theano_fn(args):
     predict = theano.function([inpt_noise], [image_fake_det, probs_fake_det])
     print '- 3 of 4 compiled.'
     reconstr = theano.function(
-        [corr_image, corr_mask], [reconstr_noise, image_reconstr, reconstr_loss], updates=[(reconstr_noise, update_rule)])
+        [corr_image, corr_mask], [reconstr_noise, image_reconstr, reconstr_loss, grad],
+	updates=[(reconstr_noise_shrd, update_rule)])
     print '- 4 of 4 compiled.'
     print 'compiled.'
 
-    return train_d, train_g, predict, reconstr, (discriminator, generator)
+    return train_d, train_g, predict, reconstr, reconstr_noise_shrd, (discriminator, generator)
 
 
-def reconstruct_img(images_full, mask_corr, reconstr_fn):
+def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
     """
     Reconstructs the image
     ---
@@ -116,15 +117,16 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn):
 
     preds = np.ones((images_full.shape[0], 3, 64, 64))
     images_corr = np.product((images_full, mask_corr))
-    print 'images corr shape', images_corr.shape
 
     for i, image_corr in enumerate(images_corr):
-	    image_corr = np.expand_dims(image_corr, axis=0)
-        delta = float('inf')
-        while delta > 0.0001
+        image_corr = np.expand_dims(image_corr, axis=0)
+        reconstr_noise_shrd.set_value(
+            np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
+        for _ in xrange(25):
             reconstr_out = reconstr_fn(image_corr, mask_corr)
-            reconstr_noise, prediction, reconstr_loss = reconstr_out
-            print 'reconstr_loss', reconstr_loss
+            reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
+            print 'reconstr_loss\t', reconstr_loss
+            print 'grad\t', np.sum(grad)
         preds[i] = prediction[0]
 
     reconstr_images = mask_corr * images_corr + (1.0 - mask_corr) * preds
@@ -136,7 +138,7 @@ def main():
     args = utils.get_args()
 
     # Settings for training
-    BATCH_SIZE = 128
+    BATCH_SIZE = 256
     NB_EPOCHS = args.epochs  # default 25
     NB_GEN = args.gen  # default 5
     EARLY_STOP_LIMIT = 10
@@ -155,7 +157,7 @@ def main():
 
     # build network and get theano functions for training
     theano_fn = gen_theano_fn(args)
-    train_discr, train_gen, predict, reconstr_fn, model = theano_fn
+    train_discr, train_gen, predict, reconstr_fn, reconstr_noise_shrd, model = theano_fn
 
     # get different file names for the split data set
     train_files = utils.get_preprocessed_files(train_path)
@@ -212,19 +214,21 @@ def main():
                                            batch_size=BATCH_SIZE)
 
             for batch_idx in schemes_train.get_request_iterator():
-
+                
+                t_batch = time.time()
                 # generate batch of uniform samples
                 rdm_d = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
                 rdm_d = rdm_d.astype(theano.config.floatX)
 
                 # train with a minibatch on discriminator
+                t_train = time.time()
                 d_batch_loss = train_discr(train_full[batch_idx], rdm_d)
-
                 steps_loss_d.append(d_batch_loss)
                 steps_loss_g.append(g_batch_loss)
 
                 if num_batch % BATCH_PRINT_DELAY == 0:
-                    print '- train discr batch %s, loss %s' % (num_batch, np.round(d_batch_loss, 4))
+                    print '- train discr batch %s, loss %s in %s sec' % (num_batch, np.round(d_batch_loss, 4),
+		 						                                         np.round(time.time() - t_train, 2))
 
                 if num_batch % GEN_TRAIN_DELAY == 0:
 
@@ -280,7 +284,7 @@ def main():
 
         # reconstruct image
         img_uncorrpt = valid_full[batch_valid]
-        img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn)
+        img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
         # save images
         utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' %(i+1), show=False, save=True, tanh=False)
