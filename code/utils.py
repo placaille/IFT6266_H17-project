@@ -155,7 +155,7 @@ def gen_pics(inputs, targts, preds, epoch, show=False, save=False):
                 pred_im.show(title='img_epoch_%s_id_%s_pred' % (epoch + 1, i))
 
 
-def gen_pics_gan(args, preds, epoch, show=False, save=False, tanh=True):
+def save_pics_gan(args, image, save_code, show=False, save=False, tanh=True):
     """
     Generates and/or save image out of array using PIL
     """
@@ -164,10 +164,10 @@ def gen_pics_gan(args, preds, epoch, show=False, save=False, tanh=True):
         for pred in preds:
             i += 1
             if tanh:
-                pred = (np.transpose(pred, axes=(1, 2, 0)) + 1) / 2.0
+                image = (np.transpose(image, axes=(1, 2, 0)) + 1) / 2.0
             else:
-                pred = np.transpose(pred, axes=(1, 2, 0))
-            pred_im = Image.fromarray(np.uint8(pred * 255))
+                image = np.transpose(image, axes=(1, 2, 0))
+            true_im = Image.fromarray(np.uint8(pred * 255))
             if save:
 
                 if args.mila:
@@ -177,10 +177,10 @@ def gen_pics_gan(args, preds, epoch, show=False, save=False, tanh=True):
 
                 if not os.path.exists(path):
                     os.makedirs(path)
-                pred_im.save(os.path.join(path, 'img_epoch_%s_id_%s_pred.jpg' % (epoch + 1, i)))
+                true_im.save(os.path.join(path, 'img_epoch_%s_id_%s_pred.jpg' % (save_code, i)))
 
             if show:
-                pred_im.show(title='img_epoch_%s_id_%s_pred' % (epoch + 1, i))
+                true_im.show(title='img_epoch_%s_id_%s_pred' % (save_code, i))
 
         if save:
             print 'images were saved to %s' % path
