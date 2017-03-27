@@ -25,8 +25,8 @@ def gen_theano_fn(args):
     # Setup input variables
     inpt_noise = T.matrix()
     inpt_image = T.tensor4()
-    corr_mask = T.matrix() # corruption mask
-    corr_image = T.tensor3()
+    corr_mask = T.tensor4() # corruption mask
+    corr_image = T.tensor4()
 
     # Shared variable for image reconstruction
     reconstr_noise = theano.shared(
