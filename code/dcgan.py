@@ -4,7 +4,6 @@
 import numpy as np
 import time
 import os
-import glob
 import theano
 import theano.tensor as T
 import lasagne
@@ -25,7 +24,7 @@ def gen_theano_fn(args):
     # Setup input variables
     inpt_noise = T.matrix('inpt_noise')
     inpt_image = T.tensor4('inpt_image')
-    corr_mask = T.matrix('corr_mask') # corruption mask
+    corr_mask = T.matrix('corr_mask')  # corruption mask
     corr_image = T.tensor4('corr_image')
 
     # Shared variable for image reconstruction
@@ -81,7 +80,6 @@ def gen_theano_fn(args):
     reconstr_loss = contx_loss + lbda * prcpt_loss
 
     # Set update rule that will change the input noise
-    #reconstr_updates = lasagne.updates.sgd(reconstr_loss, reconstr_noise, 0.0001)
     grad = T.grad(reconstr_loss, reconstr_noise_shrd)
     lr = 1.0
     update_rule = reconstr_noise_shrd - lr * grad
@@ -101,7 +99,7 @@ def gen_theano_fn(args):
     print '- 3 of 4 compiled.'
     reconstr = theano.function(
         [corr_image, corr_mask], [reconstr_noise_shrd, image_reconstr, reconstr_loss, grad],
-	updates=[(reconstr_noise_shrd, update_rule)])
+        updates=[(reconstr_noise_shrd, update_rule)])
     print '- 4 of 4 compiled.'
     print 'compiled.'
 
@@ -133,14 +131,12 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
 
 
 def main():
-
     args = utils.get_args()
 
     # Settings for training
     BATCH_SIZE = 128
     NB_EPOCHS = args.epochs  # default 25
     NB_GEN = args.gen  # default 5
-    EARLY_STOP_LIMIT = 10
     GEN_TRAIN_DELAY = 30
     GEN_TRAIN_LOOPS = 10
 
@@ -172,9 +168,7 @@ def main():
 
     print 'Starting training...'
 
-    valid_loss = []
     train_loss = []
-    best_valid_loss = float('inf')
 
     if not args.reload == None:
         discriminator, generator = model
@@ -193,8 +187,8 @@ def main():
         t_epoch = time.time()
         d_batch_loss = 0
         g_batch_loss = 0
-        steps_loss_g = [] # will store every loss of generator
-        steps_loss_d = [] # will store every loss of discriminator
+        steps_loss_g = []  # will store every loss of generator
+        steps_loss_d = []  # will store every loss of discriminator
 
         # iterate of split datasets
         for file_id in np.random.choice(NB_TRAIN_FILES, NB_TRAIN_FILES, replace=False):
@@ -213,7 +207,7 @@ def main():
                                            batch_size=BATCH_SIZE)
 
             for batch_idx in schemes_train.get_request_iterator():
-                
+
                 t_batch = time.time()
                 # generate batch of uniform samples
                 rdm_d = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
@@ -227,7 +221,7 @@ def main():
 
                 if num_batch % BATCH_PRINT_DELAY == 0:
                     print '- train discr batch %s, loss %s in %s sec' % (num_batch, np.round(d_batch_loss, 4),
-		 						                                         np.round(time.time() - t_train, 2))
+                                                                         np.round(time.time() - t_batch, 2))
 
                 if num_batch % GEN_TRAIN_DELAY == 0:
 
@@ -244,7 +238,7 @@ def main():
                         steps_loss_g.append(g_batch_loss)
 
                         if num_batch % BATCH_PRINT_DELAY == 0:
-                            print '- train gen step %s, loss %s' %(_+1, np.round(g_batch_loss, 4))
+                            print '- train gen step %s, loss %s' % (_ + 1, np.round(g_batch_loss, 4))
 
                 epoch_loss += d_batch_loss + g_batch_loss
                 num_batch += 1
@@ -262,7 +256,6 @@ def main():
         # gen_noise = np.random.uniform(-1., 1., size=(NB_GEN, 100))
         # gen_noise = gen_noise.astype(theano.config.floatX)
         # preds_gen, probs_discr = predict(gen_noise)
-
 
         # Reconstruct images from valid set
         # choose random valid file
@@ -286,12 +279,11 @@ def main():
         img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
         # save images
-        utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' %(i+1), show=False, save=True, tanh=False)
-        utils.save_pics_gan(args, img_uncorrpt, 'true_epoch_%s' %(i+1), show=False, save=True, tanh=False)
+        utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
+        utils.save_pics_gan(args, img_uncorrpt, 'true_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
 
         # save losses at each step
         utils.dump_objects_output(args, (steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
-
 
     print 'Training completed.'
 
@@ -300,5 +292,4 @@ def main():
 
 
 if __name__ == '__main__':
-
     main()
