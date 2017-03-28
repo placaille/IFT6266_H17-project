@@ -72,17 +72,17 @@ def gen_theano_fn(args):
         loss_gener, params_gener, learning_rate=0.0005, beta1=0.6)
 
     # Contextual and perceptual loss for
-    contx_loss = lasagne.objectives.squared_error(
-        image_reconstr * corr_mask, corr_image * corr_mask).mean()
-    prcpt_loss = T.log(1.0 - probs_reconstr).mean()
+    contx_loss = T.mean(lasagne.objectives.squared_error(
+        image_reconstr * corr_mask, corr_image * corr_mask))
+    prcpt_loss = T.mean(T.log(1 - probs_reconstr))
 
     # Total loss
-    lbda = 0.0001
+    lbda = 10.0 ** -5
     reconstr_loss = contx_loss + lbda * prcpt_loss
 
     # Set update rule that will change the input noise
     grad = T.grad(reconstr_loss, reconstr_noise_shrd)
-    lr = 1.0
+    lr = 0.9
     update_rule = reconstr_noise_shrd - lr * grad
 
     if args.verbose:
@@ -116,6 +116,8 @@ def main():
     NB_GEN = args.gen  # default 5
     GEN_TRAIN_DELAY = 10
     GEN_TRAIN_LOOPS = 5
+    RELOAD_SRC = args.reload[0]
+    RELOAD_ID = args.reload[1]
 
     if args.verbose:
         BATCH_PRINT_DELAY = 1
@@ -149,10 +151,10 @@ def main():
 
     if not args.reload == None:
         discriminator, generator = model
-        file_discr = 'discrminator_epoch_%s.pkl' % args.reload
-        file_gen = 'generator_epoch_%s.pkl' % args.reload
-        discriminator = utils.reload_model(args, discriminator, file_discr)
-        generator = utils.reload_model(args, generator, file_gen)
+        file_discr = 'discrminator_epoch_%s.pkl' % RELOAD_ID
+        file_gen = 'generator_epoch_%s.pkl' % RELOAD_ID
+        discriminator = utils.reload_model(args, discriminator, file_discr, RELOAD_SRC)
+        generator = utils.reload_model(args, generator, file_gen, RELOAD_SRC)
 
     for i in xrange(NB_EPOCHS):
 

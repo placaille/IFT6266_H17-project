@@ -219,13 +219,13 @@ def save_model(args, network, filename):
     print 'Model saved to file %s' % filename
 
 
-def reload_model(args, network, filename):
+def reload_model(args, network, filename, rslts_src):
     """
     Returns the network loaded of the parameters
     Will try to get filename in './output/saved_models'
     """
     if args.mila:
-        src_dir = '/data/lisatmp3/lacaillp/output/saved_models/'
+        src_dir = os.path.join('/data/lisatmp3/lacaillp/results/', str(rslts_src), 'saved_models/')
         dst_dir = '/Tmp/lacaillp/input/saved_models/'
     elif args.laptop:
         src_dir = '/Users/phil/input/saved_models/'
@@ -276,7 +276,7 @@ def move_results_from_local():
         else:
             print 'Copy of data to %s was successful, local copy will be deleted...' % dst_dir
             shutil.rmtree(src_dir)
-            print 'Local data was deleted from' % src_dir
+            print 'Local data was deleted from %s' % src_dir
 
 
 def get_args():
@@ -298,7 +298,7 @@ def get_args():
                         action='store_true')
     parser.add_argument('-s', '--save', help='Nb of epochs between saving model',
                         type=int, default=0)
-    parser.add_argument('-r', '--reload', help='Reload previously trained model',
-                        type=str, default=None)
+    parser.add_argument('-r', '--reload', help='Reload previously trained model (rslts_src, id)',
+                        type=str, default=None, nargs='+')
 
     return parser.parse_args()

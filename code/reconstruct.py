@@ -28,9 +28,26 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
             np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
 
         # 100 epoch on image to find best matching latent variables
-        for _ in xrange(100):
+        it = 0
+        nb_grad_0 = 0
+        while True:
             reconstr_out = reconstr_fn(image_corr, mask_corr)
             reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
+
+            if it % 500 == 0:
+                print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
+                print 'image %s - grad iteration %s - %s' % (i+1, it, np.sum(grad))
+
+            if np.abs(np.sum(grad)) < 0.00001:
+                nb_grad_0 += 1
+                if nb_grad_0 == 5:
+                    print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
+                    print 'image %s - grad iteration %s - %s' % (i+1, it, np.sum(grad))
+                    break
+            else:
+                nb_grad_0 = 0
+
+            it += 1
 
         preds[i] = prediction[0]
 
@@ -42,6 +59,8 @@ def main():
     args = utils.get_args()
 
     NB_GEN = args.gen  # default 5
+    RELOAD_SRC = args.reload[0]
+    RELOAD_ID = args.reload[1]
 
     # if running on server (MILA), copy dataset locally
     dataset_path = utils.init_dataset(args, 'mscoco_inpainting/preprocessed')
@@ -63,11 +82,11 @@ def main():
 
         # Reload previously saved model
         discriminator, generator = model
-        file_discr = 'discrminator_epoch_%s.pkl' % args.reload
-        file_gen = 'generator_epoch_%s.pkl' % args.reload
+        file_discr = 'discrminator_epoch_%s.pkl' % RELOAD_ID
+        file_gen = 'generator_epoch_%s.pkl' % RELOAD_ID
         t_load = time.time()
-        loaded_discr = utils.reload_model(args, discriminator, file_discr)
-        loaded_gen = utils.reload_model(args, generator, file_gen)
+        loaded_discr = utils.reload_model(args, discriminator, file_discr, RELOAD_SRC)
+        loaded_gen = utils.reload_model(args, generator, file_gen, RELOAD_SRC)
 
         if loaded_discr and loaded_gen:
 
@@ -94,8 +113,8 @@ def main():
             img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
             # save images
-            utils.save_pics_gan(args, img_reconstr, 'pred_rload_%s' % args.reload, show=False, save=True, tanh=False)
-            utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s' % args.reload, show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, img_reconstr, 'pred_rload_%s_%s' % (RELOAD_SRC, RELOAD_ID), show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s_%s' % (RELOAD_SRC, RELOAD_ID), show=False, save=True, tanh=False)
 
             if args.mila:
                 utils.move_results_from_local()
