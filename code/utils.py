@@ -89,23 +89,6 @@ def get_corruption_mask():
     return corruption_mask
 
 
-def get_preprocessed_batch_data(batch_idx,
-                   # PATH need to be fixed
-                   path="/Tmp/inpainting/", split="train2014"):
-    '''
-    Show an example of how to read the dataset
-    @return inputs, targets, captions, color_count
-    '''
-
-    data_path = os.path.join(path, split)
-
-    # print data_path + "/*.jpg"
-    imgs = np.asarray(glob.glob(data_path + "/*.jpg"))
-    batch_imgs = imgs[batch_idx]
-
-    return returns
-
-
 def init_dataset(args, dataset_name):
     """
     If running from MILA, copy on /Tmp/lacaillp/datasets/
