@@ -120,10 +120,9 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
         image_corr = np.expand_dims(image_corr, axis=0)
         reconstr_noise_shrd.set_value(
             np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
-        for _ in xrange(25):
+        for _ in xrange(100):
             reconstr_out = reconstr_fn(image_corr, mask_corr)
             reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
-            print 'grad\t', np.sum(grad)
         preds[i] = prediction[0]
 
     reconstr_images = mask_corr * images_corr + (1.0 - mask_corr) * preds
@@ -258,29 +257,29 @@ def main():
         # preds_gen, probs_discr = predict(gen_noise)
 
         # Reconstruct images from valid set
-        # choose random valid file
-        file_id = np.random.choice(NB_VALID_FILES, 1)
+        if NB_GEN > 0:
+            # choose random valid file
+            file_id = np.random.choice(NB_VALID_FILES, 1)
 
-        # load file
-        with open(valid_full_files[file_id], 'r') as f:
-            valid_full = np.load(f).astype(theano.config.floatX)
+            # load file
+            with open(valid_full_files[file_id], 'r') as f:
+                valid_full = np.load(f).astype(theano.config.floatX)
 
-        t_load = time.time()
+            t_load = time.time()
 
-        if args.verbose:
-            print 'file %s loaded in %s sec' % (valid_full_files[file_id], round(time.time() - t_load, 0))
+            if args.verbose:
+                print 'file %s loaded in %s sec' % (valid_full_files[file_id], round(time.time() - t_load, 0))
 
-        # pick a given number of images from that file
-        batch_valid = np.random.choice(len(valid_full), NB_GEN, replace=False)
-        print 'batch valid', batch_valid
+            # pick a given number of images from that file
+            batch_valid = np.random.choice(len(valid_full), NB_GEN, replace=False)
 
-        # reconstruct image
-        img_uncorrpt = valid_full[batch_valid]
-        img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
+            # reconstruct image
+            img_uncorrpt = valid_full[batch_valid]
+            img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
-        # save images
-        utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
-        utils.save_pics_gan(args, img_uncorrpt, 'true_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
+            # save images
+            utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, img_uncorrpt, 'true_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
 
         # save losses at each step
         utils.dump_objects_output(args, (steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
