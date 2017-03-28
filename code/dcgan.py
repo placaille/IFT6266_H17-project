@@ -12,6 +12,7 @@ from fuel.schemes import ShuffledScheme
 
 import models
 import utils
+from reconstruct import reconstruct_img
 
 
 def gen_theano_fn(args):
@@ -104,29 +105,6 @@ def gen_theano_fn(args):
     print 'compiled.'
 
     return train_d, train_g, predict, reconstr, reconstr_noise_shrd, (discriminator, generator)
-
-
-def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
-    """
-    Reconstructs the image
-    ---
-    mask_corr: matrix that is applied to make the image corrupted
-    """
-
-    preds = np.ones((images_full.shape[0], 3, 64, 64))
-    images_corr = np.product((images_full, mask_corr))
-
-    for i, image_corr in enumerate(images_corr):
-        image_corr = np.expand_dims(image_corr, axis=0)
-        reconstr_noise_shrd.set_value(
-            np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
-        for _ in xrange(100):
-            reconstr_out = reconstr_fn(image_corr, mask_corr)
-            reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
-        preds[i] = prediction[0]
-
-    reconstr_images = mask_corr * images_corr + (1.0 - mask_corr) * preds
-    return reconstr_images
 
 
 def main():

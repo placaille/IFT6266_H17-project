@@ -225,20 +225,32 @@ def reload_model(args, network, filename):
     Will try to get filename in './output/saved_models'
     """
     if args.mila:
-        path = '/Tmp/lacaillp/output/saved_models/'
+        src_dir = '/data/lisatmp3/lacaillp/output/saved_models/'
+        dst_dir = '/Tmp/lacaillp/input/saved_models/'
     elif args.laptop:
-        path = '/Users/phil/output/saved_models/'
+        src_dir = '/Users/phil/input/saved_models/'
+        dst_dir = src_dir
 
-    full_path = os.path.join(path, filename)
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+
+    full_path = os.path.join(dst_dir, filename)
+
+    print 'Copying saved model %s locally...' % filename
+    shutil.copy(os.path.join(src_dir, filename), full_path)
+    print 'Completed.'
+
+    print 'Initiating loading...'
     try:
         with open(full_path, 'rb') as f:
-            values = pkl.load(full_path)
+            values = pkl.load(f)
     except:
         print 'An error occured, model wasn\'t loaded.'
+        return False
     else:
         lyr.set_all_param_values(network, values)
         print 'Network was successfully loaded from %s' % full_path
-        return network
+        return True
 
 
 def move_results_from_local():
