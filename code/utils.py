@@ -274,9 +274,9 @@ def move_results_from_local():
         except:
             print 'Copy of data wasn\'t successful, local data was not deleted.'
         else:
-            print 'Copy of data to %s was successful, local copy was deleted.' % dst_dir
+            print 'Copy of data to %s was successful, local copy will be deleted...' % dst_dir
             shutil.rmtree(src_dir)
-            print 'Local data was deleted. dir = %s' % src_dir
+            print 'Local data was deleted from' % src_dir
 
 
 def get_args():

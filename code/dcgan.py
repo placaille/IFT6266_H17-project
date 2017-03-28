@@ -12,7 +12,7 @@ from fuel.schemes import ShuffledScheme
 
 import models
 import utils
-from reconstruct import reconstruct_img
+import reconstruct
 
 
 def gen_theano_fn(args):
@@ -114,8 +114,8 @@ def main():
     BATCH_SIZE = 128
     NB_EPOCHS = args.epochs  # default 25
     NB_GEN = args.gen  # default 5
-    GEN_TRAIN_DELAY = 30
-    GEN_TRAIN_LOOPS = 10
+    GEN_TRAIN_DELAY = 10
+    GEN_TRAIN_LOOPS = 5
 
     if args.verbose:
         BATCH_PRINT_DELAY = 1
@@ -253,7 +253,8 @@ def main():
 
             # reconstruct image
             img_uncorrpt = valid_full[batch_valid]
-            img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
+            img_reconstr = reconstruct.reconstruct_img(
+                img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
             # save images
             utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
