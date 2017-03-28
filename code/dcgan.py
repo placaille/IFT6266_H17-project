@@ -100,7 +100,7 @@ def gen_theano_fn(args):
     predict = theano.function([inpt_noise], [image_fake_det, probs_fake_det])
     print '- 3 of 4 compiled.'
     reconstr = theano.function(
-        [corr_image, corr_mask], [reconstr_noise, image_reconstr, reconstr_loss, grad],
+        [corr_image, corr_mask], [reconstr_noise_shrd, image_reconstr, reconstr_loss, grad],
 	updates=[(reconstr_noise_shrd, update_rule)])
     print '- 4 of 4 compiled.'
     print 'compiled.'
@@ -125,7 +125,6 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
         for _ in xrange(25):
             reconstr_out = reconstr_fn(image_corr, mask_corr)
             reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
-            print 'reconstr_loss\t', reconstr_loss
             print 'grad\t', np.sum(grad)
         preds[i] = prediction[0]
 
@@ -138,7 +137,7 @@ def main():
     args = utils.get_args()
 
     # Settings for training
-    BATCH_SIZE = 256
+    BATCH_SIZE = 128
     NB_EPOCHS = args.epochs  # default 25
     NB_GEN = args.gen  # default 5
     EARLY_STOP_LIMIT = 10
