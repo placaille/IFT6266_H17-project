@@ -34,7 +34,7 @@ def gen_theano_fn(args):
 
     # Build generator and discriminator
     dc_gan = models.DCGAN(args)
-    generator = dc_gan.init_generator(first_layer=64, input_var=None)
+    generator = dc_gan.init_generator(first_layer=128, input_var=None)
     discriminator = dc_gan.init_discriminator(first_layer=128, input_var=None)
 
     # Get images from generator (for training and outputing images)
@@ -114,8 +114,8 @@ def main():
     BATCH_SIZE = 128
     NB_EPOCHS = args.epochs  # default 25
     NB_GEN = args.gen  # default 5
-    GEN_TRAIN_DELAY = 10
-    GEN_TRAIN_LOOPS = 5
+    TRAIN_STEPS_DISCR = 15
+    TRAIN_STEPS_GEN = 10
     if args.reload is not None:
         RELOAD_SRC = args.reload[0]
         RELOAD_ID = args.reload[1]
@@ -150,7 +150,7 @@ def main():
 
     train_loss = []
 
-    if not args.reload == None:
+    if args.reload is not None:
         discriminator, generator = model
         file_discr = 'discrminator_epoch_%s.pkl' % RELOAD_ID
         file_gen = 'generator_epoch_%s.pkl' % RELOAD_ID
@@ -169,6 +169,7 @@ def main():
         g_batch_loss = 0
         steps_loss_g = []  # will store every loss of generator
         steps_loss_d = []  # will store every loss of discriminator
+        d_train_step = 0
 
         # iterate of split datasets
         for file_id in np.random.choice(NB_TRAIN_FILES, NB_TRAIN_FILES, replace=False):
@@ -188,6 +189,8 @@ def main():
 
             for batch_idx in schemes_train.get_request_iterator():
 
+                d_train_step += 1
+
                 t_batch = time.time()
                 # generate batch of uniform samples
                 rdm_d = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
@@ -202,13 +205,17 @@ def main():
                 if num_batch % BATCH_PRINT_DELAY == 0:
                     print '- train discr batch %s, loss %s in %s sec' % (num_batch, np.round(d_batch_loss, 4),
                                                                          np.round(time.time() - t_batch, 2))
+                # check if it is time to train the generator
+                if d_train_step >= TRAIN_STEPS_DISCR:
 
-                if num_batch % GEN_TRAIN_DELAY == 0:
+                    # reset discriminator step counter
+                    d_train_step = 0
 
-                    for _ in xrange(GEN_TRAIN_LOOPS):
+                    # train the generator for given number of steps
+                    for _ in xrange(TRAIN_STEPS_GEN):
 
                         # generate batch of uniform samples
-                        rdm_g = np.random.uniform(-1., 1., size=(len(batch_idx), 100))
+                        rdm_g = np.random.uniform(-1., 1., size=(BATCH_SIZE, 100))
                         rdm_g = rdm_g.astype(theano.config.floatX)
 
                         # train with a minibatch on generator
@@ -255,18 +262,39 @@ def main():
             batch_valid = np.random.choice(len(valid_full), NB_GEN, replace=False)
 
             # reconstruct image
-            img_uncorrpt = valid_full[batch_valid]
-            img_reconstr = reconstruct.reconstruct_img(
-                img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
+            imgs_uncorrpt = valid_full[batch_valid]
+            imgs_reconstr = reconstruct.reconstruct_img(
+                imgs_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
             # save images
-            utils.save_pics_gan(args, img_reconstr, 'pred_rload_%s_%s' % (RELOAD_SRC, RELOAD_ID), show=False, save=True, tanh=False)
-            utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s_%s' % (RELOAD_SRC, RELOAD_ID), show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, imgs_reconstr, 'pred_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, imgs_uncorrpt, 'true_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
 
         # save losses at each step
         utils.dump_objects_output(args, (steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
 
     print 'Training completed.'
+
+    # Generate images out of pure noise
+    if NB_GEN > 0:
+
+        if args.reload is not None:
+            assert loaded_gen and loaded_discr, 'An error occured during loading, cannot generate.'
+            save_code = 'rload_%s_%s' % (RELOAD_SRC, RELOAD_ID)
+        else:
+            save_code = 'epoch_%s' % (i + 1)
+
+        rdm_noise = np.random.uniform(-1., 1., size=(NB_GEN, 100))
+        rdm_noise = rdm_noise.astype(theano.config.floatX)
+
+        # train with a minibatch on generator
+        imgs_noise, probs_noise = predict(rdm_noise)
+
+        if args.verbose:
+            print probs_noise
+
+        # save images
+        utils.save_pics_gan(args, imgs_noise, 'noise_' + save_code, show=False, save=True, tanh=False)
 
     if args.mila:
         utils.move_results_from_local()

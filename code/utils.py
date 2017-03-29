@@ -263,7 +263,7 @@ def move_results_from_local():
     dst_dir = '/data/lisatmp3/lacaillp/output/'
 
     if not os.path.exists(src_dir):
-        print '%s doesn\'t exist, nothing was copied.'
+        print '%s doesn\'t exist, nothing was copied.' % src_dir
     else:
 
         if not os.path.exists(dst_dir):
