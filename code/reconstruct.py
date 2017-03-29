@@ -59,8 +59,9 @@ def main():
     args = utils.get_args()
 
     NB_GEN = args.gen  # default 5
-    RELOAD_SRC = args.reload[0]
-    RELOAD_ID = args.reload[1]
+    if args.reload is not None:
+        RELOAD_SRC = args.reload[0]
+        RELOAD_ID = args.reload[1]
 
     # if running on server (MILA), copy dataset locally
     dataset_path = utils.init_dataset(args, 'mscoco_inpainting/preprocessed')

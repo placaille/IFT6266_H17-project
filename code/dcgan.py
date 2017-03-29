@@ -116,8 +116,9 @@ def main():
     NB_GEN = args.gen  # default 5
     GEN_TRAIN_DELAY = 10
     GEN_TRAIN_LOOPS = 5
-    RELOAD_SRC = args.reload[0]
-    RELOAD_ID = args.reload[1]
+    if args.reload is not None:
+        RELOAD_SRC = args.reload[0]
+        RELOAD_ID = args.reload[1]
 
     if args.verbose:
         BATCH_PRINT_DELAY = 1
