@@ -153,8 +153,8 @@ def main():
         discriminator, generator = model
         file_discr = 'discrminator_epoch_%s.pkl' % RELOAD_ID
         file_gen = 'generator_epoch_%s.pkl' % RELOAD_ID
-        discriminator = utils.reload_model(args, discriminator, file_discr, RELOAD_SRC)
-        generator = utils.reload_model(args, generator, file_gen, RELOAD_SRC)
+        loaded_discr = utils.reload_model(args, discriminator, file_discr, RELOAD_SRC)
+        loaded_gen = utils.reload_model(args, generator, file_gen, RELOAD_SRC)
 
     for i in xrange(NB_EPOCHS):
 
@@ -259,8 +259,8 @@ def main():
                 img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
             # save images
-            utils.save_pics_gan(args, img_reconstr, 'pred_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
-            utils.save_pics_gan(args, img_uncorrpt, 'true_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, img_reconstr, 'pred_rload_%s_%s' % (RELOAD_SRC, RELOAD_ID), show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s_%s' % (RELOAD_SRC, RELOAD_ID), show=False, save=True, tanh=False)
 
         # save losses at each step
         utils.dump_objects_output(args, (steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
