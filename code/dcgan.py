@@ -34,7 +34,7 @@ def gen_theano_fn(args):
 
     # Build generator and discriminator
     dc_gan = models.DCGAN(args)
-    generator = dc_gan.init_generator(first_layer=128, input_var=None)
+    generator = dc_gan.init_generator(first_layer=64, input_var=None)
     discriminator = dc_gan.init_discriminator(first_layer=128, input_var=None)
 
     # Get images from generator (for training and outputing images)

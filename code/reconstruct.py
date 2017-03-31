@@ -34,18 +34,16 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
             reconstr_out = reconstr_fn(image_corr, mask_corr)
             reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
 
+            norm = np.linalg.norm(grad, ord=1)
+
             if it % 500 == 0:
                 print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
-                print 'image %s - grad iteration %s - %s' % (i+1, it, np.sum(grad))
+                print 'image %s - grad iteration %s - %s' % (i+1, it, norm)
 
-            if np.abs(np.sum(grad)) < 0.00001:
-                nb_grad_0 += 1
-                if nb_grad_0 == 5:
-                    print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
-                    print 'image %s - grad iteration %s - %s' % (i+1, it, np.sum(grad))
-                    break
-            else:
-                nb_grad_0 = 0
+            if norm < 0.0001:
+                print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
+                print 'image %s - grad iteration %s - %s' % (i+1, it, norm)
+                break
 
             it += 1
 
