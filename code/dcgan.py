@@ -8,6 +8,7 @@ import theano
 import theano.tensor as T
 import lasagne
 import lasagne.layers as lyr
+import cPickle as pkl
 from fuel.schemes import ShuffledScheme
 
 import models
@@ -130,6 +131,11 @@ def main():
     train_path = os.path.join(dataset_path, 'train2014')
     valid_path = os.path.join(dataset_path, 'val2014')
 
+    if args.captions:
+        t = time.time()
+        embedding_model = utils.init_google_word2vec_model(args)
+        print 'Embedding model was loaded in %s secs' % np.round(time.time() - t, 0)
+
     # build network and get theano functions for training
     theano_fn = gen_theano_fn(args)
     train_discr, train_gen, predict, reconstr_fn, reconstr_noise_shrd, model = theano_fn
@@ -176,9 +182,13 @@ def main():
 
             t_load = time.time()
 
-            # load file
+            # load file with full image
             with open(train_full_files[file_id], 'r') as f:
                 train_full = np.load(f).astype(theano.config.floatX)
+
+            # load file with the captions
+            with open(train_capt_files[file_id], 'rb') as f:
+                train_capt = pkl.load(f)
 
             if args.verbose:
                 print 'file %s loaded in %s sec' % (train_full_files[file_id], round(time.time() - t_load, 0))
@@ -188,6 +198,14 @@ def main():
                                            batch_size=BATCH_SIZE)
 
             for batch_idx in schemes_train.get_request_iterator():
+
+                if args.captions:
+                    t = time.time()
+                    capts_batch = utils.captions_to_embedded_matrix(embedding_model, batch_idx, train_capt)
+                    print 'captions laoded in %s sec' % np.round(time.time() - t, 0)
+                    print capts_batch.shape
+
+                input('potato')
 
                 d_train_step += 1
 

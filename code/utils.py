@@ -117,6 +117,35 @@ def init_dataset(args, dataset_name):
     return dst_dir + dataset_name
 
 
+def init_google_word2vec_model(args):
+    """
+    Copy locally the Google model and load it
+    Returns the model
+    """
+    if not args.mila and args.captions:
+        raise 'Captions cannot be used under this location due to memory requirements'
+
+    src_dir = '/data/lisatmp3/lacaillp/models/google_word2vec/'
+    dst_dir = '/Tmp/lacaillp/models/google_word2vec/'
+
+    model_name = 'GoogleNews-vectors-negative300.bin.gz'
+
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+
+    if not os.path.exists(dst_dir + model_name):
+        print 'Word2Vec model not stored locally, copying %s to %s...' \
+            % (model_name, dst_dir)
+        shutil.copy(src_dir + model_name, dst_dir)
+        print 'Copy completed.'
+
+    print 'Loading Word2Vec model...'
+    model = gensim.models.KeyedVectors.load_word2vec_format(src_dir + model_name, binary=True)
+    print 'Loading completed.'
+
+    return model
+
+
 def gen_pics(inputs, targts, preds, epoch, show=False, save=False):
     """
     Generates and/or save image out of array using PIL
@@ -301,6 +330,8 @@ def get_args():
                         type=int, default=0)
     parser.add_argument('-r', '--reload', help='Reload previously trained model (rslts_src, id)',
                         type=str, default=None, nargs='+')
+    parser.add_argument('-c', '--captions', help='Flag to use captions in model',
+                        action='store_true', default=False)
 
     return parser.parse_args()
 
