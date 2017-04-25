@@ -7,6 +7,7 @@ import numpy as np
 import theano
 import lasagne.layers as lyr
 import argparse
+import gensim
 from distutils.dir_util import copy_tree
 
 def get_batch_data(batch_idx,
@@ -302,3 +303,31 @@ def get_args():
                         type=str, default=None, nargs='+')
 
     return parser.parse_args()
+
+
+def captions_to_embedded_matrix(embedding_model, batch_indices, captions_dict):
+    """
+    Converts captions into embedded matrix using a gensim KeyedVector model
+    Returns a matrix of size (batch_size, embedded vector size)
+    """
+
+    # create empty matrix that will store the real valued
+    embedded_matrix = np.empty(shape=(len(batch_indices), 300), dtype=theano.config.floatX)
+
+    capts = [captions_dict[idx] for idx in batch_indices]
+
+    for i, capt in enumerate(capts):
+
+        # combine all sentences for a given image into one string, lowercase and then split
+        words = " ".join(capt).lower().split()
+
+        # filter the words in the caption based on vocab of model
+        filtrd_words = filter(lambda x: x in embedding_model.vocab, words)
+
+        # get embedding vector
+        vector = embedding_model[filtrd_words]
+
+        # average over all words and store in matrix
+        embedded_matrix[i] = np.average(vector, axis=0)
+
+    return embedded_matrix
