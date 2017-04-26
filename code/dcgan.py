@@ -13,7 +13,6 @@ from fuel.schemes import ShuffledScheme
 
 import models
 import utils
-import reconstruct
 
 
 def gen_theano_fn(args):
@@ -28,20 +27,37 @@ def gen_theano_fn(args):
     inpt_image = T.tensor4('inpt_image')
     corr_mask = T.matrix('corr_mask')  # corruption mask
     corr_image = T.tensor4('corr_image')
+    if args.captions:
+        inpt_embd = T.matrix('inpt_embedding')
 
     # Shared variable for image reconstruction
     reconstr_noise_shrd = theano.shared(
         np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
 
     # Build generator and discriminator
-    dc_gan = models.DCGAN(args)
-    generator = dc_gan.init_generator(first_layer=64, input_var=None)
-    discriminator = dc_gan.init_discriminator(first_layer=128, input_var=None)
+    if args.captions:
+        cond_gen_dc_gan = models.CaptionGenOnlyDCGAN(args)
+        generator, lyr_gen_noise, lyr_gen_embd = cond_gen_dc_gan.init_generator(
+            first_layer=64, input_var=None, embedding_var=None)
+        discriminator = cond_gen_dc_gan.init_discriminator(first_layer=128, input_var=None)
+    else:
+        dc_gan = models.DCGAN(args)
+        generator = dc_gan.init_generator(first_layer=64, input_var=None)
+        discriminator = dc_gan.init_discriminator(first_layer=128, input_var=None)
 
     # Get images from generator (for training and outputing images)
-    image_fake = lyr.get_output(generator, inputs=inpt_noise)
-    image_fake_det = lyr.get_output(generator, inputs=inpt_noise, deterministic=True)
-    image_reconstr = lyr.get_output(generator, inputs=reconstr_noise_shrd, deterministic=True)
+    if args.captions:
+        image_fake = lyr.get_output(generator, inputs={lyr_gen_noise: inpt_noise, lyr_gen_embd: inpt_embd})
+        image_fake_det = lyr.get_output(generator,
+                                        inputs={lyr_gen_noise: inpt_noise, lyr_gen_embd: inpt_embd},
+                                        deterministic=True)
+        image_reconstr = lyr.get_output(generator,
+                                        inputs={lyr_gen_noise: reconstr_noise_shrd, lyr_gen_embd: inpt_embd},
+                                        deterministic=True)
+    else:
+        image_fake = lyr.get_output(generator, inputs=inpt_noise)
+        image_fake_det = lyr.get_output(generator, inputs=inpt_noise, deterministic=True)
+        image_reconstr = lyr.get_output(generator, inputs=reconstr_noise_shrd, deterministic=True)
 
     # Get probabilities from discriminator
     probs_real = lyr.get_output(discriminator, inputs=inpt_image)
@@ -91,18 +107,34 @@ def gen_theano_fn(args):
 
     # Compile Theano functions
     print 'compiling...'
-    train_d = theano.function(
-        [inpt_image, inpt_noise], loss_discr, updates=updates_discr)
-    print '- 1 of 4 compiled.'
-    train_g = theano.function(
-        [inpt_noise], loss_gener, updates=updates_gener)
-    print '- 2 of 4 compiled.'
-    predict = theano.function([inpt_noise], [image_fake_det, probs_fake_det])
-    print '- 3 of 4 compiled.'
-    reconstr = theano.function(
-        [corr_image, corr_mask], [reconstr_noise_shrd, image_reconstr, reconstr_loss, grad],
-        updates=[(reconstr_noise_shrd, update_rule)])
-    print '- 4 of 4 compiled.'
+
+    if args.captions:
+        train_d = theano.function(
+            [inpt_image, inpt_noise, inpt_embd], loss_discr, updates=updates_discr)
+        print '- 1 of 4 compiled.'
+        train_g = theano.function(
+            [inpt_noise, inpt_embd], loss_gener, updates=updates_gener)
+        print '- 2 of 4 compiled.'
+        predict = theano.function([inpt_noise, inpt_embd], [image_fake_det, probs_fake_det])
+        print '- 3 of 4 compiled.'
+        reconstr = theano.function(
+            [corr_image, corr_mask, inpt_embd], [reconstr_noise_shrd, image_reconstr, reconstr_loss, grad],
+            updates=[(reconstr_noise_shrd, update_rule)])
+        print '- 4 of 4 compiled.'
+    else:
+        train_d = theano.function(
+            [inpt_image, inpt_noise], loss_discr, updates=updates_discr)
+        print '- 1 of 4 compiled.'
+        train_g = theano.function(
+            [inpt_noise], loss_gener, updates=updates_gener)
+        print '- 2 of 4 compiled.'
+        predict = theano.function([inpt_noise], [image_fake_det, probs_fake_det])
+        print '- 3 of 4 compiled.'
+        reconstr = theano.function(
+            [corr_image, corr_mask], [reconstr_noise_shrd, image_reconstr, reconstr_loss, grad],
+            updates=[(reconstr_noise_shrd, update_rule)])
+        print '- 4 of 4 compiled.'
+
     print 'compiled.'
 
     return train_d, train_g, predict, reconstr, reconstr_noise_shrd, (discriminator, generator)
@@ -150,8 +182,6 @@ def main():
     NB_TRAIN_FILES = len(train_full_files)
     NB_VALID_FILES = len(valid_full_files)
 
-    corruption_mask = utils.get_corruption_mask()
-
     print 'Starting training...'
 
     train_loss = []
@@ -186,9 +216,10 @@ def main():
             with open(train_full_files[file_id], 'r') as f:
                 train_full = np.load(f).astype(theano.config.floatX)
 
-            # load file with the captions
-            with open(train_capt_files[file_id], 'rb') as f:
-                train_capt = pkl.load(f)
+            if args.captions:
+                # load file with the captions
+                with open(train_capt_files[file_id], 'rb') as f:
+                    train_capt = pkl.load(f)
 
             if args.verbose:
                 print 'file %s loaded in %s sec' % (train_full_files[file_id], round(time.time() - t_load, 0))
@@ -199,14 +230,6 @@ def main():
 
             for batch_idx in schemes_train.get_request_iterator():
 
-                if args.captions:
-                    t = time.time()
-                    capts_batch = utils.captions_to_embedded_matrix(embedding_model, batch_idx, train_capt)
-                    print 'captions laoded in %s sec' % np.round(time.time() - t, 0)
-                    print capts_batch.shape
-
-                input('potato')
-
                 d_train_step += 1
 
                 t_batch = time.time()
@@ -215,14 +238,22 @@ def main():
                 rdm_d = rdm_d.astype(theano.config.floatX)
 
                 # train with a minibatch on discriminator
-                t_train = time.time()
-                d_batch_loss = train_discr(train_full[batch_idx], rdm_d)
+                if args.captions:
+                    # generate embeddings for the batch
+                    d_capts_batch = utils.captions_to_embedded_matrix(embedding_model, batch_idx, train_capt)
+
+                    d_batch_loss = train_discr(train_full[batch_idx], rdm_d, d_capts_batch)
+
+                else:
+                    d_batch_loss = train_discr(train_full[batch_idx], rdm_d)
+
                 steps_loss_d.append(d_batch_loss)
                 steps_loss_g.append(g_batch_loss)
 
                 if num_batch % BATCH_PRINT_DELAY == 0:
                     print '- train discr batch %s, loss %s in %s sec' % (num_batch, np.round(d_batch_loss, 4),
                                                                          np.round(time.time() - t_batch, 2))
+
                 # check if it is time to train the generator
                 if d_train_step >= TRAIN_STEPS_DISCR:
 
@@ -237,7 +268,14 @@ def main():
                         rdm_g = rdm_g.astype(theano.config.floatX)
 
                         # train with a minibatch on generator
-                        g_batch_loss = train_gen(rdm_g)
+                        if args.captions:
+                            # sample a random set of captions from current training file
+                            g_batch_idx = np.random.choice(len(train_full), BATCH_SIZE, replace=False)
+                            g_capts_batch = utils.captions_to_embedded_matrix(embedding_model, g_batch_idx, train_capt)
+
+                            g_batch_loss = train_gen(rdm_g, g_capts_batch)
+                        else:
+                            g_batch_loss = train_gen(rdm_g)
 
                         steps_loss_d.append(d_batch_loss)
                         steps_loss_g.append(g_batch_loss)
@@ -257,62 +295,50 @@ def main():
 
         print '- Epoch train (loss %s) in %s sec' % (train_loss[i], round(time.time() - t_epoch))
 
-        # # generate some random images
-        # gen_noise = np.random.uniform(-1., 1., size=(NB_GEN, 100))
-        # gen_noise = gen_noise.astype(theano.config.floatX)
-        # preds_gen, probs_discr = predict(gen_noise)
-
-        # Reconstruct images from valid set
-        if NB_GEN > 0:
-            # choose random valid file
-            file_id = np.random.choice(NB_VALID_FILES, 1)
-
-            # load file
-            with open(valid_full_files[file_id], 'r') as f:
-                valid_full = np.load(f).astype(theano.config.floatX)
-
-            t_load = time.time()
-
-            if args.verbose:
-                print 'file %s loaded in %s sec' % (valid_full_files[file_id], round(time.time() - t_load, 0))
-
-            # pick a given number of images from that file
-            batch_valid = np.random.choice(len(valid_full), NB_GEN, replace=False)
-
-            # reconstruct image
-            imgs_uncorrpt = valid_full[batch_valid]
-            imgs_reconstr = reconstruct.reconstruct_img(
-                imgs_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
-
-            # save images
-            utils.save_pics_gan(args, imgs_reconstr, 'pred_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
-            utils.save_pics_gan(args, imgs_uncorrpt, 'true_epoch_%s' % (i + 1), show=False, save=True, tanh=False)
-
         # save losses at each step
         utils.dump_objects_output(args, (steps_loss_d, steps_loss_g), 'steps_loss_epoch_%s.pkl' % i)
 
     print 'Training completed.'
 
-    # Generate images out of pure noise
+    # Generate images out of pure noise with random captions (if applicable from valid)
     if NB_GEN > 0:
 
         if args.reload is not None:
             assert loaded_gen and loaded_discr, 'An error occured during loading, cannot generate.'
             save_code = 'rload_%s_%s' % (RELOAD_SRC, RELOAD_ID)
         else:
-            save_code = 'epoch_%s' % (i + 1)
+            save_code = 'no_reload'
 
         rdm_noise = np.random.uniform(-1., 1., size=(NB_GEN, 100))
         rdm_noise = rdm_noise.astype(theano.config.floatX)
 
-        # train with a minibatch on generator
-        imgs_noise, probs_noise = predict(rdm_noise)
+        if args.captions:
+            # choose random valid file
+            file_id = np.random.choice(NB_VALID_FILES, 1)
+
+            # load file with the captions
+            with open(valid_capt_files[file_id], 'rb') as f:
+                valid_capt = pkl.load(f)
+
+            # pick a given number of images from that file
+            batch_valid = np.random.choice(len(valid_capt), NB_GEN, replace=False)
+            captions = utils.captions_to_embedded_matrix(embedding_model, batch_valid, valid_capt)
+            # captions = np.empty((NB_GEN, 300), dtype=theano.config.floatX)  # used for debugging
+
+            # make predictions
+            imgs_noise, probs_noise = predict(rdm_noise, captions)
+        else:
+            # make predictions
+            imgs_noise, probs_noise = predict(rdm_noise)
 
         if args.verbose:
             print probs_noise
 
         # save images
-        utils.save_pics_gan(args, imgs_noise, 'noise_' + save_code, show=False, save=True, tanh=False)
+        utils.save_pics_gan(args, imgs_noise, 'noise_caption_%s' % args.captions + save_code, show=False, save=True, tanh=False)
+
+        if args.captions:
+            utils.save_captions(args, captions, save_code)
 
     if args.mila:
         utils.move_results_from_local()

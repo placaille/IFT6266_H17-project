@@ -7,9 +7,10 @@ import theano
 import os
 import time
 import numpy as np
+import cPickle as pkl
 
 
-def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
+def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd, captions=None):
     """
     Reconstructs the image
     ---
@@ -19,9 +20,15 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
     preds = np.ones((images_full.shape[0], 3, 64, 64))
     images_corr = np.product((images_full, mask_corr))
 
-    for i, image_corr in enumerate(images_corr):
+    if captions is None:
+        captions_loop = xrange(images_full.shape[0])
+    else:
+        captions_loop = captions
+
+    for i, (image_corr, caption) in enumerate(zip(images_corr, captions_loop)):
 
         image_corr = np.expand_dims(image_corr, axis=0)
+        caption = np.expand_dims(caption, axis=0)
 
         # set value of noise for new image
         reconstr_noise_shrd.set_value(
@@ -31,7 +38,11 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd):
         it = 0
         nb_grad_0 = 0
         while True:
-            reconstr_out = reconstr_fn(image_corr, mask_corr)
+            if captions is not None:
+                reconstr_out = reconstr_fn(image_corr, mask_corr, caption)
+            else:
+                reconstr_out = reconstr_fn(image_corr, mask_corr)
+
             reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
 
             norm = np.linalg.norm(grad, ord=1)
@@ -64,6 +75,11 @@ def main():
     # if running on server (MILA), copy dataset locally
     dataset_path = utils.init_dataset(args, 'mscoco_inpainting/preprocessed')
     valid_path = os.path.join(dataset_path, 'val2014')
+
+    if args.captions:
+        t = time.time()
+        embedding_model = utils.init_google_word2vec_model(args)
+        print 'Embedding model was loaded in %s secs' % np.round(time.time() - t, 0)
 
     # build network and get theano functions for training
     theano_fn = dcgan.gen_theano_fn(args)
@@ -99,6 +115,11 @@ def main():
             with open(valid_full_files[file_id], 'r') as f:
                 valid_full = np.load(f).astype(theano.config.floatX)
 
+            if args.captions:
+                # load file with the captions
+                with open(valid_capt_files[file_id], 'rb') as f:
+                    valid_capt = pkl.load(f)
+
             t_load = time.time()
 
             if args.verbose:
@@ -109,11 +130,18 @@ def main():
 
             # reconstruct image
             img_uncorrpt = valid_full[batch_valid]
-            img_reconstr = reconstruct_img(img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
+
+            if args.captions:
+                captions = utils.captions_to_embedded_matrix(embedding_model, batch_valid, valid_capt)
+                img_reconstr = reconstruct_img(
+                    img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd, captions)
+            else:
+                img_reconstr = reconstruct_img(
+                    img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
             # save images
-            utils.save_pics_gan(args, img_reconstr, 'pred_rload_%s_%s' % (RELOAD_SRC, RELOAD_ID), show=False, save=True, tanh=False)
-            utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s_%s' % (RELOAD_SRC, RELOAD_ID), show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, img_reconstr, 'pred_rload_%s_%s_caption_%s' % (RELOAD_SRC, RELOAD_ID, args.captions), show=False, save=True, tanh=False)
+            utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s_%s_caption_%s' % (RELOAD_SRC, RELOAD_ID, args.captions), show=False, save=True, tanh=False)
 
             if args.mila:
                 utils.move_results_from_local()
