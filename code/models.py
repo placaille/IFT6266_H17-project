@@ -391,3 +391,128 @@ class DCGAN:
                 print 'generator layer %s output shape:' %i, layer.output_shape
 
         return l_out
+
+
+class CaptionGenOnlyDCGAN:
+    """
+    Incorporates caption embeddings
+
+    DCGAN implementation based on Yeh et al. 2016
+    http://arxiv.org/pdf/1607.07539v2
+    - with batch norm
+    - with leaky relus in discriminator only (0.2 slope)
+    - with regular relus in generator
+    """
+
+    def __init__(self, args):
+        self.verbose = args.verbose
+
+    def init_discriminator(self, first_layer, input_var=None):
+        """
+        Initialize the DCGAN discriminator network using lasagne
+        Returns the network
+        """
+
+        lrelu = nonlinearities.LeakyRectify(0.2)
+        layers = []
+
+        l_in = lyr.InputLayer((None, 3, 64, 64), input_var)
+        layers.append(l_in)
+
+        l_1 = lyr.Conv2DLayer(
+            incoming=l_in, num_filters=first_layer, filter_size=5, stride=2, pad=2,
+            nonlinearity=lrelu
+        )
+        layers.append(l_1)
+
+        l_2 = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=l_1, num_filters=first_layer*2, filter_size=5, stride=2, pad=2,
+            nonlinearity=lrelu
+        ))
+        layers.append(l_2)
+
+        l_3 = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=l_2, num_filters=first_layer*4, filter_size=5, stride=2, pad=2,
+            nonlinearity=lrelu
+        ))
+        layers.append(l_3)
+
+        l_4 = lyr.batch_norm(lyr.Conv2DLayer(
+            incoming=l_3, num_filters=first_layer*8, filter_size=5, stride=2, pad=2,
+            nonlinearity=lrelu
+        ))
+        l_4 = lyr.FlattenLayer(l_4)
+        layers.append(l_4)
+
+        l_out = lyr.DenseLayer(
+            incoming=l_4, num_units=1,
+            nonlinearity=nonlinearities.sigmoid
+        )
+        layers.append(l_out)
+
+        if self.verbose:
+            for i, layer in enumerate(layers):
+                print 'dicriminator layer %s output shape:' %i, layer.output_shape
+
+        return l_out
+
+    def init_generator(self, first_layer, input_var=None, embedding_var=None):
+        """
+        Initialize the DCGAN generator network using lasagne
+        Additional units: Number of units to be added at the dense layer to compensate for embedding
+        Returns the network
+        """
+
+        layers = []
+
+        l_noise = lyr.InputLayer((None, 100), input_var)
+        layers.append(l_noise)
+
+        l_embedding = lyr.InputLayer((None, 300), embedding_var)
+        layers.append(l_embedding)
+
+        l_in = lyr.ConcatLayer([l_noise, l_embedding], axis=1)
+        layers.append(l_in)
+
+        l_1 = lyr.batch_norm(lyr.DenseLayer(
+            incoming=l_in, num_units=4*4*first_layer*8, nonlinearity=nonlinearities.rectify
+        ))
+
+        l_1 = lyr.ReshapeLayer(
+            incoming=l_1, shape=(-1, first_layer*8, 4, 4)
+        )
+        layers.append(l_1)
+
+        l_2 = lyr.batch_norm(lyr.Deconv2DLayer(
+            incoming=l_1, num_filters=first_layer*4, filter_size=5, stride=2, crop=2,
+            output_size=8,
+            nonlinearity=nonlinearities.rectify
+        ))
+        layers.append(l_2)
+
+        l_3 = lyr.batch_norm(lyr.Deconv2DLayer(
+            incoming=l_2, num_filters=first_layer*2, filter_size=5, stride=2, crop=2,
+            output_size=16,
+            nonlinearity=nonlinearities.rectify
+        ))
+        layers.append(l_3)
+
+        l_4 = lyr.batch_norm(lyr.Deconv2DLayer(
+            incoming=l_3, num_filters=first_layer, filter_size=5, stride=2, crop=2,
+            output_size=32,
+            nonlinearity=nonlinearities.rectify
+        ))
+        layers.append(l_4)
+
+        l_out = lyr.Deconv2DLayer(
+            incoming=l_4, num_filters=3, filter_size=5, stride=2, crop=2,
+            output_size=64,
+            nonlinearity=nonlinearities.sigmoid
+        )
+        layers.append(l_out)
+
+        if self.verbose:
+            for i, layer in enumerate(layers):
+                print 'generator layer %s output shape:' %i, layer.output_shape
+
+        return l_out, l_noise, l_embedding
