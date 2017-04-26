@@ -338,7 +338,7 @@ def main():
         utils.save_pics_gan(args, imgs_noise, 'noise_caption_%s' % args.captions + save_code, show=False, save=True, tanh=False)
 
         if args.captions:
-            utils.save_captions(args, captions, save_code)
+            utils.save_captions(args, save_code, valid_capt, batch_valid)
 
     if args.mila:
         utils.move_results_from_local()

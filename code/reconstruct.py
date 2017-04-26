@@ -147,6 +147,10 @@ def main():
                 utils.save_pics_gan(args, images_reconstr, 'pred_rload_%s_%s_caption_%s_copy_%s' % (RELOAD_SRC, RELOAD_ID, args.captions, i), show=False, save=True, tanh=False)
             utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s_%s_caption_%s' % (RELOAD_SRC, RELOAD_ID, args.captions), show=False, save=True, tanh=False)
 
+            if args.captions:
+                save_code = 'rload_%s_%s' % (RELOAD_SRC, RELOAD_ID)
+                utils.save_captions(args, save_code, valid_capt, batch_valid)
+
             if args.mila:
                 utils.move_results_from_local()
 

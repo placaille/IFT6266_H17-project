@@ -212,7 +212,7 @@ def save_pics_gan(args, images, save_code, show=False, save=False, tanh=True):
             print 'images were saved to %s' % path
 
 
-def save_captions(args, captions, save_code):
+def save_captions(args, save_code, captions_dict, batch_indices):
     if args.mila:
         path = '/Tmp/lacaillp/output/captions/'
     elif args.laptop:
@@ -221,9 +221,9 @@ def save_captions(args, captions, save_code):
     if not os.path.exists(path):
         os.makedirs(path)
 
-    for i, caption in enumerate(captions):
-        with open(os.path.join(path, 'caption_%s_id_%s.pkl' % (save_code, i)), 'wb') as f:
-            pkl.dump(caption, f)
+    for i, indice in enumerate(batch_indices):
+        with open(os.path.join(path, 'caption_%s_id_%s.pkl' % (save_code, i+1)), 'wb') as f:
+            pkl.dump(captions_dict[indice], f)
         print 'captions were saved to %s' % path
 
 
