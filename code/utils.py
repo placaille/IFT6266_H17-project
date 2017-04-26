@@ -212,6 +212,21 @@ def save_pics_gan(args, images, save_code, show=False, save=False, tanh=True):
             print 'images were saved to %s' % path
 
 
+def save_captions(args, captions, save_code):
+    if args.mila:
+        path = '/Tmp/lacaillp/output/captions/'
+    elif args.laptop:
+        path = '/Users/phil/output/captions/'
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    for i, caption in enumerate(captions):
+        with open(os.path.join(path, 'caption_%s_id_%s.pkl' % (save_code, i)), 'wb') as f:
+            pkl.dump(caption, f)
+        print 'captions were saved to %s' % path
+
+
 def dump_objects_output(args, object, filename):
     """
     Dumps any object using pickle into ./output/objects_dump/ directory
@@ -360,5 +375,8 @@ def captions_to_embedded_matrix(embedding_model, batch_indices, captions_dict):
 
         # average over all words and store in matrix
         embedded_matrix[i] = np.average(vector, axis=0)
+
+    if embedded_matrix.ndim == 1:
+        embedded_matrix = np.expand_dims(embedded_matrix, axis=0)
 
     return embedded_matrix
