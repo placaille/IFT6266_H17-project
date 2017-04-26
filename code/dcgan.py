@@ -312,9 +312,14 @@ def main():
         rdm_noise = np.random.uniform(-1., 1., size=(NB_GEN, 100))
         rdm_noise = rdm_noise.astype(theano.config.floatX)
 
+        # choose random valid file
+        file_id = np.random.choice(NB_VALID_FILES, 1)
+
+        # load file
+        with open(valid_full_files[file_id], 'r') as f:
+            valid_full = np.load(f).astype(theano.config.floatX)
+
         if args.captions:
-            # choose random valid file
-            file_id = np.random.choice(NB_VALID_FILES, 1)
 
             # load file with the captions
             with open(valid_capt_files[file_id], 'rb') as f:
@@ -335,7 +340,10 @@ def main():
             print probs_noise
 
         # save images
+        true_imgs = valid_full[batch_valid]
+
         utils.save_pics_gan(args, imgs_noise, 'noise_caption_%s' % args.captions + save_code, show=False, save=True, tanh=False)
+        utils.save_pics_gan(args, true_imgs, 'true_caption_%s' % args.captions + save_code, show=False, save=True, tanh=False)
 
         if args.captions:
             utils.save_captions(args, save_code, valid_capt, batch_valid)

@@ -144,7 +144,7 @@ def main():
 
             # save images
             for i, images_reconstr in enumerate(img_reconstr):
-                utils.save_pics_gan(args, images_reconstr, 'pred_rload_%s_%s_caption_%s_copy_%s' % (RELOAD_SRC, RELOAD_ID, args.captions, i), show=False, save=True, tanh=False)
+                utils.save_pics_gan(args, images_reconstr, 'pred_rload_%s_%s_caption_%s_copy_%s' % (RELOAD_SRC, RELOAD_ID, args.captions, i+1), show=False, save=True, tanh=False)
             utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s_%s_caption_%s' % (RELOAD_SRC, RELOAD_ID, args.captions), show=False, save=True, tanh=False)
 
             if args.captions:
