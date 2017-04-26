@@ -10,7 +10,7 @@ import numpy as np
 import cPickle as pkl
 
 
-def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd, captions=None):
+def reconstruct_img(args, images_full, mask_corr, reconstr_fn, reconstr_noise_shrd, captions=None):
     """
     Reconstructs the image
     ---
@@ -19,48 +19,51 @@ def reconstruct_img(images_full, mask_corr, reconstr_fn, reconstr_noise_shrd, ca
 
     preds = np.ones((images_full.shape[0], 3, 64, 64))
     images_corr = np.product((images_full, mask_corr))
+    reconstr_images = []
 
     if captions is None:
         captions_loop = xrange(images_full.shape[0])
     else:
         captions_loop = captions
 
-    for i, (image_corr, caption) in enumerate(zip(images_corr, captions_loop)):
+    for copy in xrange(args.duplicates):
 
-        image_corr = np.expand_dims(image_corr, axis=0)
-        caption = np.expand_dims(caption, axis=0)
+        for i, (image_corr, caption) in enumerate(zip(images_corr, captions_loop)):
 
-        # set value of noise for new image
-        reconstr_noise_shrd.set_value(
-            np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
+            image_corr = np.expand_dims(image_corr, axis=0)
+            caption = np.expand_dims(caption, axis=0)
 
-        # 100 epoch on image to find best matching latent variables
-        it = 0
-        nb_grad_0 = 0
-        while True:
-            if captions is not None:
-                reconstr_out = reconstr_fn(image_corr, mask_corr, caption)
-            else:
-                reconstr_out = reconstr_fn(image_corr, mask_corr)
+            # set value of noise for new image
+            reconstr_noise_shrd.set_value(
+                np.random.uniform(-1., 1., size=(1, 100)).astype(theano.config.floatX))
 
-            reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
+            # 100 epoch on image to find best matching latent variables
+            it = 0
+            nb_grad_0 = 0
+            while True:
+                if captions is not None:
+                    reconstr_out = reconstr_fn(image_corr, mask_corr, caption)
+                else:
+                    reconstr_out = reconstr_fn(image_corr, mask_corr)
 
-            norm = np.linalg.norm(grad, ord=1)
+                reconstr_noise, prediction, reconstr_loss, grad = reconstr_out
 
-            if it % 500 == 0:
-                print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
-                print 'image %s - grad iteration %s - %s' % (i+1, it, norm)
+                norm = np.linalg.norm(grad, ord=1)
 
-            if norm < 0.0001:
-                print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
-                print 'image %s - grad iteration %s - %s' % (i+1, it, norm)
-                break
+                if it % 500 == 0:
+                    print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
+                    print 'image %s - grad iteration %s - %s' % (i+1, it, norm)
 
-            it += 1
+                if norm < 0.0001:
+                    print 'image %s - loss iteration %s - %s' % (i+1, it, reconstr_loss)
+                    print 'image %s - grad iteration %s - %s' % (i+1, it, norm)
+                    break
 
-        preds[i] = prediction[0]
+                it += 1
 
-    reconstr_images = mask_corr * images_corr + (1.0 - mask_corr) * preds
+            preds[i] = prediction[0]
+
+        reconstr_images.append(mask_corr * images_corr + (1.0 - mask_corr) * preds)
     return reconstr_images
 
 
@@ -134,13 +137,14 @@ def main():
             if args.captions:
                 captions = utils.captions_to_embedded_matrix(embedding_model, batch_valid, valid_capt)
                 img_reconstr = reconstruct_img(
-                    img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd, captions)
+                    args, img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd, captions)
             else:
                 img_reconstr = reconstruct_img(
-                    img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
+                    args, img_uncorrpt, corruption_mask, reconstr_fn, reconstr_noise_shrd)
 
             # save images
-            utils.save_pics_gan(args, img_reconstr, 'pred_rload_%s_%s_caption_%s' % (RELOAD_SRC, RELOAD_ID, args.captions), show=False, save=True, tanh=False)
+            for i, images_reconstr in enumerate(img_reconstr):
+                utils.save_pics_gan(args, images_reconstr, 'pred_rload_%s_%s_caption_%s_copy_%s' % (RELOAD_SRC, RELOAD_ID, args.captions, i), show=False, save=True, tanh=False)
             utils.save_pics_gan(args, img_uncorrpt, 'true_rload_%s_%s_caption_%s' % (RELOAD_SRC, RELOAD_ID, args.captions), show=False, save=True, tanh=False)
 
             if args.mila:
