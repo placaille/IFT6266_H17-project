@@ -267,7 +267,7 @@ def save_model(args, network, filename):
 def reload_model(args, network, filename, rslts_src):
     """
     Returns the network loaded of the parameters
-    Will try to get filename in './output/saved_models'
+    Will try to get filename in '/data/lisatmp3/lacaillp/results/rslts_src/saved_models/filename'
     """
     if args.mila:
         src_dir = os.path.join('/data/lisatmp3/lacaillp/results/', str(rslts_src), 'saved_models/')
@@ -347,6 +347,8 @@ def get_args():
                         type=str, default=None, nargs='+')
     parser.add_argument('-c', '--captions', help='Flag to use captions in model',
                         action='store_true', default=False)
+    parser.add_argument('-d', '--duplicates', help='Number of duplicates for each image generated',
+                        type=int, default=1)
 
     return parser.parse_args()
 
