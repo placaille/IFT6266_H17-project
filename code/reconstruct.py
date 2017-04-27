@@ -20,6 +20,7 @@ def reconstruct_img(args, images_full, mask_corr, reconstr_fn, reconstr_noise_sh
     preds = np.ones((images_full.shape[0], 3, 64, 64))
     images_corr = np.product((images_full, mask_corr))
     reconstr_images = []
+    MAX_STEP = 250000
 
     if captions is None:
         captions_loop = xrange(images_full.shape[0])
@@ -39,8 +40,11 @@ def reconstruct_img(args, images_full, mask_corr, reconstr_fn, reconstr_noise_sh
 
             # 100 epoch on image to find best matching latent variables
             it = 0
-            nb_grad_0 = 0
-            while True:
+            nb_step = 0
+            while True and nb_step <= MAX_STEP:
+
+                nb_step += 1
+
                 if captions is not None:
                     reconstr_out = reconstr_fn(image_corr, mask_corr, caption)
                 else:
